@@ -2,162 +2,172 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Administrador de Consolas</title>
   <style>
-    body { font-family: sans-serif; background: #f4f4f4; margin: 20px; }
-    .consola, .producto-form { border: 1px solid #ccc; border-radius: 10px; background: white; padding: 15px; margin-bottom: 20px; }
-    .consola h3, .producto-form h3 { margin-top: 0; }
-    button { margin: 5px; padding: 5px 10px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
-    th { background: #f0f0f0; }
+    body { font-family: sans-serif; background: #f0f0f0; margin: 0; padding: 20px; }
+    h1, h2 { text-align: center; }
+    .consola { background: #fff; padding: 15px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .botones button { margin-right: 5px; }
+    .historial, .ventas { margin-top: 30px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    input[type="text"], input[type="number"] { margin-right: 5px; }
   </style>
 </head>
 <body>
 
-  <h1>Administrador de Consolas</h1>
+  <h1>Administrador de Consolas de Videojuego</h1>
 
   <div id="consolas"></div>
 
-  <h2>Historial de Consolas</h2>
-  <table id="historial">
-    <thead>
-      <tr>
-        <th>Consola</th><th>Inicio</th><th>Duración</th><th>Pago</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <div class="producto-form">
-    <h3>Registrar Producto Vendido</h3>
-    <input type="text" id="producto" placeholder="Producto" />
-    <input type="number" id="precio" placeholder="Precio unitario" />
-    <input type="number" id="cantidad" placeholder="Cantidad" />
-    <button onclick="registrarProducto()">Registrar Producto</button>
+  <h2>Registrar Venta</h2>
+  <div>
+    <input type="text" id="producto" placeholder="Producto">
+    <input type="number" id="precio" placeholder="Precio">
+    <input type="number" id="cantidad" placeholder="Cantidad">
+    <button onclick="registrarVenta()">Registrar Venta</button>
   </div>
 
-  <h2>Productos Vendidos</h2>
-  <table id="productos">
-    <thead>
-      <tr>
-        <th>Producto</th><th>Precio</th><th>Cantidad</th><th>Total</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <div class="ventas">
+    <h2>Historial de Ventas</h2>
+    <table id="tablaVentas">
+      <tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Total</th></tr>
+    </table>
+  </div>
 
-  <audio id="beep" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+  <div class="historial">
+    <h2>Historial de Tiempo</h2>
+    <table id="tablaHistorial">
+      <tr><th>Consola</th><th>Tiempo</th><th>Pago</th><th>Fecha</th></tr>
+    </table>
+  </div>
+
+  <audio id="alarma" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" preload="auto"></audio>
 
   <script>
-    const NUM_CONSOLAS = 5;
-    const consolasContainer = document.getElementById('consolas');
-    const historial = JSON.parse(localStorage.getItem('historial') || '[]');
-    const productos = JSON.parse(localStorage.getItem('productos') || '[]');
+    const alarmSound = document.getElementById('alarma');
+    const consolasDiv = document.getElementById("consolas");
+    const historialTabla = document.getElementById("tablaHistorial");
+    const tablaVentas = document.getElementById("tablaVentas");
 
-    const beep = document.getElementById('beep');
+    let historial = JSON.parse(localStorage.getItem("historial")) || [];
+    let ventas = JSON.parse(localStorage.getItem("ventas")) || [];
 
-    const historialTable = document.querySelector('#historial tbody');
-    const productosTable = document.querySelector('#productos tbody');
-
-    function renderHistorial() {
-      historialTable.innerHTML = '';
-      historial.forEach(e => {
-        const row = historialTable.insertRow();
-        row.innerHTML = `<td>${e.id}</td><td>${e.inicio}</td><td>${e.duracion}</td><td>$${e.pago}</td>`;
-      });
-    }
-
-    function renderProductos() {
-      productosTable.innerHTML = '';
-      productos.forEach(p => {
-        const row = productosTable.insertRow();
-        row.innerHTML = `<td>${p.nombre}</td><td>$${p.precio}</td><td>${p.cantidad}</td><td>$${p.total}</td>`;
-      });
-    }
-
-    function registrarProducto() {
-      const nombre = document.getElementById('producto').value;
-      const precio = parseFloat(document.getElementById('precio').value);
-      const cantidad = parseInt(document.getElementById('cantidad').value);
-      if (!nombre || isNaN(precio) || isNaN(cantidad)) return alert("Llena todos los campos");
-      const total = precio * cantidad;
-      productos.push({ nombre, precio, cantidad, total });
-      localStorage.setItem('productos', JSON.stringify(productos));
-      renderProductos();
-      document.getElementById('producto').value = '';
-      document.getElementById('precio').value = '';
-      document.getElementById('cantidad').value = '';
-    }
-
-    for (let i = 1; i <= NUM_CONSOLAS; i++) {
-      const div = document.createElement('div');
-      div.className = 'consola';
-      div.innerHTML = `
-        <h3>Consola ${i}</h3>
-        <input type="number" id="minutos-${i}" placeholder="Minutos" />
-        <input type="number" id="pago-${i}" placeholder="Pago $" />
-        <button onclick="iniciar(${i})">Iniciar</button>
-        <button onclick="pausar(${i})">Pausar</button>
-        <button onclick="reanudar(${i})">Reanudar</button>
-        <button onclick="agregarMinuto(${i})">+1 minuto</button>
-        <p id="tiempo-${i}">00:00</p>
-      `;
-      consolasContainer.appendChild(div);
-    }
-
-    const timers = {};
-    const pausados = {};
-
-    function iniciar(id) {
-      const minutos = parseInt(document.getElementById(`minutos-${id}`).value);
-      const pago = parseFloat(document.getElementById(`pago-${id}`).value);
-      if (isNaN(minutos)) return alert("Ingresa los minutos");
-      const totalSegundos = minutos * 60;
-      const inicio = new Date();
-      const fin = new Date(inicio.getTime() + totalSegundos * 1000);
-      timers[id] = { tiempo: totalSegundos, fin, interval: null, pausado: false, pago, inicio: inicio.toLocaleTimeString() };
-
-      if (timers[id].interval) clearInterval(timers[id].interval);
-      timers[id].interval = setInterval(() => actualizar(id), 1000);
-    }
-
-    function actualizar(id) {
-      if (!timers[id] || timers[id].pausado) return;
-      timers[id].tiempo--;
-      const m = String(Math.floor(timers[id].tiempo / 60)).padStart(2, '0');
-      const s = String(timers[id].tiempo % 60).padStart(2, '0');
-      document.getElementById(`tiempo-${id}`).innerText = `${m}:${s}`;
-      if (timers[id].tiempo <= 0) {
-        clearInterval(timers[id].interval);
-        beep.play();
-        historial.push({
-          id: `Consola ${id}`,
-          inicio: timers[id].inicio,
-          duracion: document.getElementById(`minutos-${id}`).value + ' min',
-          pago: timers[id].pago || 0
-        });
-        localStorage.setItem('historial', JSON.stringify(historial));
-        renderHistorial();
-        alert(`¡Tiempo finalizado para Consola ${id}!`);
+    function crearConsolas() {
+      for (let i = 1; i <= 5; i++) {
+        const div = document.createElement("div");
+        div.className = "consola";
+        div.innerHTML = `
+          <h2>Consola ${i}</h2>
+          <p>Tiempo: <span id="tiempo${i}">0</span> min</p>
+          <div class="botones">
+            <button onclick="iniciar(${i})">Iniciar</button>
+            <button onclick="pausar(${i})">Pausar</button>
+            <button onclick="agregar(${i})">+1 Min</button>
+            <button onclick="reiniciar(${i})">Reiniciar</button>
+            <button onclick="eliminar(${i})">Eliminar Tiempo</button>
+          </div>
+          <div>
+            <input type="number" id="pago${i}" placeholder="Pago $">
+          </div>
+        `;
+        consolasDiv.appendChild(div);
       }
     }
 
-    function pausar(id) {
-      if (timers[id]) timers[id].pausado = true;
+    let intervalos = {};
+    let tiempos = { 1:0, 2:0, 3:0, 4:0, 5:0 };
+
+    function actualizarTiempoDisplay(i) {
+      document.getElementById(`tiempo${i}`).innerText = tiempos[i];
     }
 
-    function reanudar(id) {
-      if (timers[id]) timers[id].pausado = false;
+    function iniciar(i) {
+      if (intervalos[i]) return;
+      intervalos[i] = setInterval(() => {
+        tiempos[i]--;
+        if (tiempos[i] <= 0) {
+          tiempos[i] = 0;
+          pausar(i);
+          alarmSound.play();
+        }
+        actualizarTiempoDisplay(i);
+      }, 60000);
     }
 
-    function agregarMinuto(id) {
-      if (timers[id]) timers[id].tiempo += 60;
+    function pausar(i) {
+      clearInterval(intervalos[i]);
+      intervalos[i] = null;
     }
 
-    renderHistorial();
-    renderProductos();
+    function agregar(i) {
+      tiempos[i]++;
+      actualizarTiempoDisplay(i);
+    }
+
+    function reiniciar(i) {
+      pausar(i);
+      tiempos[i] = 0;
+      actualizarTiempoDisplay(i);
+    }
+
+    function eliminar(i) {
+      reiniciar(i);
+      const rows = Array.from(historialTabla.rows).slice(1);
+      rows.forEach(row => {
+        if (row.cells[0].innerText == `Consola ${i}`) {
+          historialTabla.deleteRow(row.rowIndex);
+        }
+      });
+    }
+
+    function guardarHistorial() {
+      localStorage.setItem("historial", JSON.stringify(historial));
+    }
+
+    function guardarVentas() {
+      localStorage.setItem("ventas", JSON.stringify(ventas));
+    }
+
+    function agregarAHistorial(i) {
+      const pago = document.getElementById(`pago${i}`).value || "0";
+      const fecha = new Date().toLocaleString();
+      const fila = `<tr><td>Consola ${i}</td><td>${tiempos[i]} min</td><td>$${pago}</td><td>${fecha}</td></tr>`;
+      historialTabla.innerHTML += fila;
+      historial.push({ consola: i, tiempo: tiempos[i], pago, fecha });
+      guardarHistorial();
+    }
+
+    function registrarVenta() {
+      const producto = document.getElementById("producto").value;
+      const precio = parseFloat(document.getElementById("precio").value);
+      const cantidad = parseInt(document.getElementById("cantidad").value);
+      const total = (precio * cantidad).toFixed(2);
+      const fila = `<tr><td>${producto}</td><td>$${precio}</td><td>${cantidad}</td><td>$${total}</td></tr>`;
+      tablaVentas.innerHTML += fila;
+      ventas.push({ producto, precio, cantidad, total });
+      guardarVentas();
+    }
+
+    function cargarHistorial() {
+      historial.forEach(entry => {
+        historialTabla.innerHTML += `<tr><td>Consola ${entry.consola}</td><td>${entry.tiempo} min</td><td>$${entry.pago}</td><td>${entry.fecha}</td></tr>`;
+      });
+      ventas.forEach(entry => {
+        tablaVentas.innerHTML += `<tr><td>${entry.producto}</td><td>$${entry.precio}</td><td>${entry.cantidad}</td><td>$${entry.total}</td></tr>`;
+      });
+    }
+
+    window.onload = () => {
+      crearConsolas();
+      cargarHistorial();
+      // Guardar en historial al cerrar la pestaña
+      window.addEventListener("beforeunload", () => {
+        for (let i = 1; i <= 5; i++) {
+          if (tiempos[i] > 0) agregarAHistorial(i);
+        }
+      });
+    };
   </script>
 </body>
 </html>
