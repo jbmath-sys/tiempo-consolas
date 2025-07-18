@@ -6,145 +6,136 @@
   <title>Control de Tiempo - Consolas</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #1c1c1c;
-      color: #f1f1f1;
-      text-align: center;
-      padding: 2rem;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #1c1c1c;
+      color: #fff;
+      padding: 20px;
     }
     h1 {
-      color: #00ffcc;
+      text-align: center;
+      color: #00ffaa;
     }
-    input, button {
-      padding: 0.5rem;
-      margin: 0.3rem;
-      font-size: 1rem;
+    .consola {
+      background: #2c2c2c;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #00ffaa33;
     }
-    #clientes {
-      margin-top: 2rem;
+    label, input, button, select {
+      margin: 5px;
     }
-    .cliente {
-      background: #2b2b2b;
-      border: 1px solid #444;
-      padding: 1rem;
-      margin: 0.5rem auto;
-      max-width: 400px;
-      border-radius: 8px;
+    .btn {
+      padding: 6px 12px;
+      margin: 2px;
+      border: none;
+      border-radius: 5px;
+      background-color: #00ffaa;
+      color: black;
+      cursor: pointer;
     }
-    .paused {
-      background-color: #555;
+    .btn:hover {
+      background-color: #00ddaa;
+    }
+    .historial {
+      margin-top: 20px;
+      background: #111;
+      padding: 10px;
+      border-radius: 10px;
+    }
+    .consola-id {
+      font-size: 1.2em;
+      background: #00ffaa;
+      color: #000;
+      padding: 4px 8px;
+      border-radius: 50%;
+      font-weight: bold;
+      margin-right: 8px;
     }
   </style>
 </head>
 <body>
-  <h1>🎮 Control de Consolas</h1>
+  <h1>Administrador de Consolas</h1>
 
-  <label for="consola">ID Consola:</label>
-  <input type="text" id="consola" placeholder="Ej. Consola 1"/>
+  <div id="contenedor-consolas"></div>
 
-  <label for="tiempo">Minutos:</label>
-  <input type="number" id="tiempo" placeholder="Ej. 30" />
+  <h2>Historial de uso diario</h2>
+  <div id="historial" class="historial"></div>
 
-  <button onclick="agregarCliente()">Iniciar</button>
-
-  <div id="clientes"></div>
+  <audio id="beep" src="https://www.soundjay.com/buttons/beep-07.mp3" preload="auto"></audio>
 
   <script>
-    let maxClientes = 5;
-    let clientes = [];
+    const historial = document.getElementById("historial");
+    const beep = document.getElementById("beep");
 
-    function agregarCliente() {
-      if (clientes.length >= maxClientes) {
-        alert("Límite de 5 consolas activas alcanzado.");
-        return;
-      }
+    const contenedor = document.getElementById("contenedor-consolas");
 
-      let consola = document.getElementById("consola").value.trim();
-      let tiempo = parseInt(document.getElementById("tiempo").value);
+    const MAX_CONSOLAS = 5;
 
-      if (!consola || isNaN(tiempo) || tiempo <= 0) {
-        alert("Introduce una consola válida y un tiempo en minutos.");
-        return;
-      }
-
-      const id = Date.now();
-      const cliente = {
-        id,
-        consola,
-        tiempo: tiempo * 60,
-        intervalo: null,
-        pausado: false
-      };
-
-      clientes.push(cliente);
-      mostrarClientes();
-      iniciarTemporizador(cliente);
-      document.getElementById("consola").value = "";
-      document.getElementById("tiempo").value = "";
+    for (let i = 1; i <= MAX_CONSOLAS; i++) {
+      contenedor.innerHTML += `
+        <div class="consola" id="consola-${i}">
+          <span class="consola-id">${i}</span>
+          <label>Nombre:</label>
+          <input type="text" id="nombre-${i}" placeholder="Jugador ${i}"/>
+          <label>Minutos:</label>
+          <input type="number" id="tiempo-${i}" value="30" min="1"/>
+          <button class="btn" onclick="iniciar(${i})">Iniciar</button>
+          <button class="btn" onclick="pausar(${i})">Pausar</button>
+          <button class="btn" onclick="agregarMinuto(${i})">+1 Min</button>
+          <div id="display-${i}">00:00</div>
+        </div>
+      `;
     }
 
-    function mostrarClientes() {
-      const contenedor = document.getElementById("clientes");
-      contenedor.innerHTML = "";
+    let temporizadores = Array(MAX_CONSOLAS + 1).fill(null);
+    let pausados = Array(MAX_CONSOLAS + 1).fill(false);
+    let tiempoRestante = Array(MAX_CONSOLAS + 1).fill(0);
 
-      clientes.forEach((c) => {
-        const div = document.createElement("div");
-        div.className = "cliente" + (c.pausado ? " paused" : "");
-        div.innerHTML = `
-          <h3>${c.consola}</h3>
-          <p><strong>Tiempo:</strong> <span id="tiempo-${c.id}">${formatoTiempo(c.tiempo)}</span></p>
-          <button onclick="pausarReanudar(${c.id})">${c.pausado ? "Reanudar" : "Pausar"}</button>
-          <button onclick="agregarMinuto(${c.id})">+1 Min</button>
-          <button onclick="eliminarCliente(${c.id})">Eliminar</button>
-        `;
-        contenedor.appendChild(div);
-      });
-    }
+    function iniciar(id) {
+      const nombre = document.getElementById(`nombre-${id}`).value || `Jugador ${id}`;
+      let minutos = parseInt(document.getElementById(`tiempo-${id}`).value);
+      if (isNaN(minutos) || minutos <= 0) return;
 
-    function iniciarTemporizador(cliente) {
-      cliente.intervalo = setInterval(() => {
-        if (!cliente.pausado) {
-          cliente.tiempo--;
-          if (cliente.tiempo <= 0) {
-            clearInterval(cliente.intervalo);
-            alert(`¡Tiempo terminado para ${cliente.consola}!`);
-            eliminarCliente(cliente.id);
-            return;
+      if (temporizadores[id]) clearInterval(temporizadores[id]);
+
+      tiempoRestante[id] = minutos * 60;
+      pausados[id] = false;
+
+      temporizadores[id] = setInterval(() => {
+        if (!pausados[id]) {
+          if (tiempoRestante[id] <= 0) {
+            clearInterval(temporizadores[id]);
+            document.getElementById(`display-${id}`).innerText = "¡Tiempo finalizado!";
+            beep.play();
+            agregarHistorial(id, nombre, minutos);
+          } else {
+            tiempoRestante[id]--;
+            document.getElementById(`display-${id}`).innerText = formatoTiempo(tiempoRestante[id]);
           }
-          document.getElementById(`tiempo-${cliente.id}`).textContent = formatoTiempo(cliente.tiempo);
         }
       }, 1000);
     }
 
-    function pausarReanudar(id) {
-      const cliente = clientes.find(c => c.id === id);
-      if (cliente) {
-        cliente.pausado = !cliente.pausado;
-        mostrarClientes();
-      }
+    function pausar(id) {
+      pausados[id] = !pausados[id];
+      const btn = document.querySelector(`#consola-${id} button:nth-child(7)`);
+      btn.textContent = pausados[id] ? "Reanudar" : "Pausar";
     }
 
     function agregarMinuto(id) {
-      const cliente = clientes.find(c => c.id === id);
-      if (cliente) {
-        cliente.tiempo += 60;
-        mostrarClientes();
-      }
+      tiempoRestante[id] += 60;
     }
 
-    function eliminarCliente(id) {
-      const cliente = clientes.find(c => c.id === id);
-      if (cliente) {
-        clearInterval(cliente.intervalo);
-        clientes = clientes.filter(c => c.id !== id);
-        mostrarClientes();
-      }
+    function agregarHistorial(id, nombre, minutos) {
+      const fecha = new Date().toLocaleTimeString();
+      historial.innerHTML += `<p><strong>${fecha}</strong>: Consola ${id} - ${nombre} jugó ${minutos} min.</p>`;
     }
 
     function formatoTiempo(segundos) {
-      const m = Math.floor(segundos / 60).toString().padStart(2, '0');
-      const s = (segundos % 60).toString().padStart(2, '0');
-      return `${m}:${s}`;
+      const min = String(Math.floor(segundos / 60)).padStart(2, '0');
+      const seg = String(segundos % 60).padStart(2, '0');
+      return `${min}:${seg}`;
     }
   </script>
 </body>
