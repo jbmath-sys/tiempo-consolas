@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Control de Tiempo - Consolas</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #1a1a1a; color: white; }
+    h1 { color: #00eaff; }
+    label, input, select, button { margin: 5px; font-size: 1rem; }
+    .timer { margin: 10px 0; padding: 10px; background: #333; border-radius: 8px; }
+    .finalizado { background: #ff5050; }
+  </style>
+</head>
+<body>
+
+<h1>🎮 Control de Tiempo - Consolas</h1>
+
+<form id="formulario">
+  <label>Cliente:</label>
+  <input type="text" id="cliente" required>
+  <label>Consola:</label>
+  <select id="consola">
+    <option>PS5</option>
+    <option>Xbox</option>
+    <option>Switch</option>
+    <option>PC Gamer</option>
+  </select>
+  <label>Tiempo (min):</label>
+  <input type="number" id="minutos" min="1" required>
+  <button type="submit">Iniciar</button>
+</form>
+
+<div id="timers"></div>
+
+<script>
+  const formulario = document.getElementById('formulario');
+  const contenedor = document.getElementById('timers');
+
+  formulario.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const nombre = document.getElementById('cliente').value;
+    const consola = document.getElementById('consola').value;
+    const minutos = parseInt(document.getElementById('minutos').value);
+
+    crearTemporizador(nombre, consola, minutos);
+    formulario.reset();
+  });
+
+  function crearTemporizador(nombre, consola, minutos) {
+    const tiempoFinal = Date.now() + minutos * 60 * 1000;
+    const timerDiv = document.createElement('div');
+    timerDiv.className = 'timer';
+
+    const intervalo = setInterval(() => {
+      const restante = tiempoFinal - Date.now();
+      if (restante <= 0) {
+        clearInterval(intervalo);
+        timerDiv.classList.add('finalizado');
+        timerDiv.innerHTML = `<strong>${nombre} (${consola})</strong>: ¡Tiempo terminado!`;
+        new Audio('https://www.soundjay.com/button/sounds/beep-07.mp3').play();
+      } else {
+        const mins = Math.floor(restante / 60000);
+        const segs = Math.floor((restante % 60000) / 1000);
+        timerDiv.innerHTML = `<strong>${nombre} (${consola})</strong>: ${mins}m ${segs}s 
+        <button onclick="eliminarTemporizador(this)">Eliminar</button>`;
+      }
+    }, 1000);
+
+    contenedor.appendChild(timerDiv);
+  }
+
+  function eliminarTemporizador(btn) {
+    btn.parentElement.remove();
+  }
+</script>
+
+</body>
+</html>
