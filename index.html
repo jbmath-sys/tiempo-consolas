@@ -36,12 +36,25 @@
   const formulario = document.getElementById('formulario');
   const contenedor = document.getElementById('timers');
 
+  let temporizadoresActivos = 0;
+  const LIMITE_TEMPORIZADORES = 5;
+
   formulario.addEventListener('submit', (e) => {
     e.preventDefault();
 
-    const nombre = document.getElementById('cliente').value;
+    if (temporizadoresActivos >= LIMITE_TEMPORIZADORES) {
+      alert("⚠️ Solo puedes tener 5 consolas activas al mismo tiempo.");
+      return;
+    }
+
+    const nombre = document.getElementById('cliente').value.trim();
     const consola = document.getElementById('consola').value;
     const minutos = parseInt(document.getElementById('minutos').value);
+
+    if (!nombre || isNaN(minutos) || minutos <= 0) {
+      alert("Completa todos los campos correctamente.");
+      return;
+    }
 
     crearTemporizador(nombre, consola, minutos);
     formulario.reset();
@@ -57,7 +70,8 @@
       if (restante <= 0) {
         clearInterval(intervalo);
         timerDiv.classList.add('finalizado');
-        timerDiv.innerHTML = `<strong>${nombre} (${consola})</strong>: ¡Tiempo terminado!`;
+        timerDiv.innerHTML = `<strong>${nombre} (${consola})</strong>: ¡Tiempo terminado! 
+        <button onclick="eliminarTemporizador(this, true)">Eliminar</button>`;
         new Audio('https://www.soundjay.com/button/sounds/beep-07.mp3').play();
       } else {
         const mins = Math.floor(restante / 60000);
@@ -67,13 +81,19 @@
       }
     }, 1000);
 
+    timerDiv.dataset.intervalo = intervalo;
     contenedor.appendChild(timerDiv);
+    temporizadoresActivos++;
   }
 
-  function eliminarTemporizador(btn) {
-    btn.parentElement.remove();
+  function eliminarTemporizador(btn, finalizado = false) {
+    const div = btn.parentElement;
+    clearInterval(div.dataset.intervalo);
+    div.remove();
+    if (!finalizado) temporizadoresActivos--;
   }
 </script>
 
 </body>
 </html>
+
