@@ -1,99 +1,120 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Control de Tiempo - Consolas</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Administrador de Consolas</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #1a1a1a; color: white; }
-    h1 { color: #00eaff; }
-    label, input, select, button { margin: 5px; font-size: 1rem; }
-    .timer { margin: 10px 0; padding: 10px; background: #333; border-radius: 8px; }
-    .finalizado { background: #ff5050; }
+    body {
+      font-family: sans-serif;
+      background: #121212;
+      color: #fff;
+      margin: 0;
+      padding: 1em;
+    }
+    h1 {
+      text-align: center;
+    }
+    .consola {
+      background: #1f1f1f;
+      padding: 1em;
+      border-radius: 10px;
+      margin: 1em 0;
+      box-shadow: 0 0 10px #333;
+    }
+    label, input, button {
+      margin: 0.3em 0.2em;
+      font-size: 1em;
+    }
+    input[type="number"] {
+      width: 5em;
+    }
+    .botones {
+      margin-top: 0.5em;
+    }
   </style>
 </head>
 <body>
+  <h1>Administrador de Consolas</h1>
+  <div id="contenedor"></div>
 
-<h1>🎮 Control de Tiempo - Consolas</h1>
+  <script>
+    const MAX_CONSOLAS = 5;
+    const contenedor = document.getElementById("contenedor");
 
-<form id="formulario">
-  <label>Cliente:</label>
-  <input type="text" id="cliente" required>
-  <label>Consola:</label>
-  <select id="consola">
-    <option>PS5</option>
-    <option>Xbox</option>
-    <option>Switch</option>
-    <option>PC Gamer</option>
-  </select>
-  <label>Tiempo (min):</label>
-  <input type="number" id="minutos" min="1" required>
-  <button type="submit">Iniciar</button>
-</form>
-
-<div id="timers"></div>
-
-<script>
-  const formulario = document.getElementById('formulario');
-  const contenedor = document.getElementById('timers');
-
-  let temporizadoresActivos = 0;
-  const LIMITE_TEMPORIZADORES = 5;
-
-  formulario.addEventListener('submit', (e) => {
-    e.preventDefault();
-
-    if (temporizadoresActivos >= LIMITE_TEMPORIZADORES) {
-      alert("⚠️ Solo puedes tener 5 consolas activas al mismo tiempo.");
-      return;
+    for (let i = 1; i <= MAX_CONSOLAS; i++) {
+      crearConsola(i);
     }
 
-    const nombre = document.getElementById('cliente').value.trim();
-    const consola = document.getElementById('consola').value;
-    const minutos = parseInt(document.getElementById('minutos').value);
-
-    if (!nombre || isNaN(minutos) || minutos <= 0) {
-      alert("Completa todos los campos correctamente.");
-      return;
+    function crearConsola(id) {
+      const div = document.createElement("div");
+      div.className = "consola";
+      div.innerHTML = `
+        <label>Nombre o número de consola:</label>
+        <input type="text" id="nombre${id}" placeholder="Ej: PS5-1" />
+        <label>Tiempo (min):</label>
+        <input type="number" id="tiempo${id}" min="1" value="30" />
+        <button onclick="iniciar(${id})">Iniciar</button>
+        <div id="resultado${id}">⏱️ Sin iniciar</div>
+        <div class="botones">
+          <button onclick="pausar(${id})">⏸️ Pausar/Reanudar</button>
+          <button onclick="agregarMinuto(${id})">➕ Agregar 1 min</button>
+        </div>
+      `;
+      contenedor.appendChild(div);
     }
 
-    crearTemporizador(nombre, consola, minutos);
-    formulario.reset();
-  });
+    const timers = {};
 
-  function crearTemporizador(nombre, consola, minutos) {
-    const tiempoFinal = Date.now() + minutos * 60 * 1000;
-    const timerDiv = document.createElement('div');
-    timerDiv.className = 'timer';
-
-    const intervalo = setInterval(() => {
-      const restante = tiempoFinal - Date.now();
-      if (restante <= 0) {
-        clearInterval(intervalo);
-        timerDiv.classList.add('finalizado');
-        timerDiv.innerHTML = `<strong>${nombre} (${consola})</strong>: ¡Tiempo terminado! 
-        <button onclick="eliminarTemporizador(this, true)">Eliminar</button>`;
-        new Audio('https://www.soundjay.com/button/sounds/beep-07.mp3').play();
-      } else {
-        const mins = Math.floor(restante / 60000);
-        const segs = Math.floor((restante % 60000) / 1000);
-        timerDiv.innerHTML = `<strong>${nombre} (${consola})</strong>: ${mins}m ${segs}s 
-        <button onclick="eliminarTemporizador(this)">Eliminar</button>`;
+    function iniciar(id) {
+      const nombre = document.getElementById(`nombre${id}`).value || `Consola ${id}`;
+      const tiempoInput = document.getElementById(`tiempo${id}`);
+      const minutos = parseInt(tiempoInput.value);
+      const resultado = document.getElementById(`resultado${id}`);
+      if (isNaN(minutos) || minutos <= 0) {
+        alert("Ingresa un tiempo válido");
+        return;
       }
-    }, 1000);
 
-    timerDiv.dataset.intervalo = intervalo;
-    contenedor.appendChild(timerDiv);
-    temporizadoresActivos++;
-  }
+      clearInterval(timers[id]?.intervalo);
+      timers[id] = {
+        nombre,
+        tiempoRestante: minutos * 60,
+        pausado: false,
+        intervalo: setInterval(() => actualizar(id), 1000)
+      };
 
-  function eliminarTemporizador(btn, finalizado = false) {
-    const div = btn.parentElement;
-    clearInterval(div.dataset.intervalo);
-    div.remove();
-    if (!finalizado) temporizadoresActivos--;
-  }
-</script>
+      actualizar(id);
+    }
 
+    function actualizar(id) {
+      const timer = timers[id];
+      const resultado = document.getElementById(`resultado${id}`);
+      if (!timer || timer.pausado) return;
+
+      if (timer.tiempoRestante <= 0) {
+        clearInterval(timer.intervalo);
+        resultado.textContent = `🎮 ${timer.nombre}: ¡Tiempo terminado!`;
+        return;
+      }
+
+      const min = Math.floor(timer.tiempoRestante / 60);
+      const seg = timer.tiempoRestante % 60;
+      resultado.textContent = `🎮 ${timer.nombre}: ${min}m ${seg}s restantes`;
+      timer.tiempoRestante--;
+    }
+
+    function pausar(id) {
+      if (timers[id]) {
+        timers[id].pausado = !timers[id].pausado;
+      }
+    }
+
+    function agregarMinuto(id) {
+      if (timers[id]) {
+        timers[id].tiempoRestante += 60;
+      }
+    }
+  </script>
 </body>
 </html>
-
