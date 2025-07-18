@@ -1,205 +1,116 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
   <title>Control de Consolas</title>
   <style>
-    body {
-      font-family: sans-serif;
-      background: #222;
-      color: #eee;
-      margin: 0;
-      padding: 1rem;
-    }
-    h1 { text-align: center; }
-    .consola {
-      border: 2px solid #555;
-      border-radius: 12px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      background-color: #333;
-    }
-    .consola input, .consola button {
-      margin: 5px;
-      padding: 6px;
-      font-size: 1rem;
-    }
-    .historial {
-      background: #111;
-      margin-top: 2rem;
-      padding: 1rem;
-      border-radius: 8px;
-    }
-    .historial h3 { margin-top: 0; }
-    .label { display: inline-block; width: 80px; }
+    body { font-family: Arial; text-align: center; background: #f0f0f0; }
+    .consola { background: #fff; padding: 10px; margin: 10px; border-radius: 10px; box-shadow: 0 0 5px #999; display: inline-block; width: 250px; vertical-align: top; }
+    .historial { margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #999; padding: 5px; font-size: 14px; }
+    input, button { margin: 5px; }
   </style>
 </head>
 <body>
-  <h1>🕹️ Administrador de Consolas</h1>
-
-  <div id="contenedor"></div>
+  <h1>Administrador de Tiempo de Consolas</h1>
+  <div id="consolas"></div>
 
   <div class="historial">
-    <h3>📋 Historial del día</h3>
-    <ul id="historialLista"></ul>
+    <h2>Historial del Día</h2>
+    <table id="tablaHistorial">
+      <thead>
+        <tr>
+          <th>Consola</th>
+          <th>Inicio</th>
+          <th>Duración</th>
+          <th>Pago</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoHistorial"></tbody>
+    </table>
   </div>
 
-  <audio id="alarma" src="https://www.soundjay.com/buttons/beep-07.mp3" preload="auto"></audio>
+  <audio id="sonidoFin" src="https://www.soundjay.com/buttons/sounds/beep-07.mp3" preload="auto"></audio>
 
   <script>
-    const maxConsolas = 5;
-    const contenedor = document.getElementById("contenedor");
-    const historialLista = document.getElementById("historialLista");
-    const alarma = document.getElementById("alarma");
+    const sonido = document.getElementById("sonidoFin");
+    const historial = JSON.parse(localStorage.getItem("historialConsolas") || "[]");
+    const contenedor = document.getElementById("consolas");
+    const cuerpoHistorial = document.getElementById("cuerpoHistorial");
 
-    let datos = JSON.parse(localStorage.getItem("datosConsolas") || "[]");
-    let historial = JSON.parse(localStorage.getItem("historial") || "[]");
+    const agregarFilaHistorial = (num, inicio, duracion, pago) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${num}</td><td>${inicio}</td><td>${duracion}</td><td>$${pago}</td>`;
+      cuerpoHistorial.appendChild(tr);
+    };
 
-    function guardarDatos() {
-      localStorage.setItem("datosConsolas", JSON.stringify(datos));
-      localStorage.setItem("historial", JSON.stringify(historial));
-    }
+    historial.forEach(({ num, inicio, duracion, pago }) => {
+      agregarFilaHistorial(num, inicio, duracion, pago);
+    });
 
-    function actualizarHistorial() {
-      historialLista.innerHTML = "";
-      historial.forEach(item => {
-        const li = document.createElement("li");
-        li.textContent = `${item.hora} - Consola ${item.numero} - ${item.minutos} min - $${item.pago}`;
-        historialLista.appendChild(li);
-      });
-    }
-
-    function crearConsola(index) {
+    const crearConsola = (num) => {
       const div = document.createElement("div");
       div.className = "consola";
-
-      const numero = document.createElement("input");
-      numero.placeholder = "Consola #";
-      numero.value = datos[index]?.numero || (index + 1);
-
-      const tiempo = document.createElement("span");
-      tiempo.textContent = "00:00";
-
-      const minutosInput = document.createElement("input");
-      minutosInput.type = "number";
-      minutosInput.placeholder = "Min";
-
-      const pagoInput = document.createElement("input");
-      pagoInput.type = "number";
-      pagoInput.placeholder = "$ pago";
-
-      const iniciar = document.createElement("button");
-      iniciar.textContent = "Iniciar";
-
-      const pausar = document.createElement("button");
-      pausar.textContent = "Pausar";
-
-      const agregarMin = document.createElement("button");
-      agregarMin.textContent = "+1 min";
-
-      let tiempoRestante = 0;
-      let interval = null;
-      let pausado = false;
-
-      function mostrarTiempo() {
-        const m = Math.floor(tiempoRestante / 60).toString().padStart(2, '0');
-        const s = (tiempoRestante % 60).toString().padStart(2, '0');
-        tiempo.textContent = `${m}:${s}`;
-      }
-
-      function iniciarTemporizador() {
-        const minutos = parseInt(minutosInput.value);
-        if (isNaN(minutos) || minutos <= 0) return alert("Ingresa minutos válidos");
-
-        const pago = parseFloat(pagoInput.value) || 0;
-
-        tiempoRestante = minutos * 60;
-        mostrarTiempo();
-        pausado = false;
-
-        interval = setInterval(() => {
-          if (!pausado && tiempoRestante > 0) {
-            tiempoRestante--;
-            mostrarTiempo();
-            if (tiempoRestante === 0) {
-              alarma.play();
-              clearInterval(interval);
-            }
-          }
-        }, 1000);
-
-        historial.push({
-          hora: new Date().toLocaleTimeString(),
-          numero: numero.value,
-          minutos,
-          pago
-        });
-        datos[index] = { numero: numero.value, tiempoRestante, pausado: false };
-        guardarDatos();
-        actualizarHistorial();
-      }
-
-      function pausarTemporizador() {
-        pausado = !pausado;
-        pausar.textContent = pausado ? "Reanudar" : "Pausar";
-        datos[index].pausado = pausado;
-        guardarDatos();
-      }
-
-      function agregarUnMinuto() {
-        tiempoRestante += 60;
-        mostrarTiempo();
-        datos[index].tiempoRestante = tiempoRestante;
-        guardarDatos();
-      }
-
-      iniciar.onclick = iniciarTemporizador;
-      pausar.onclick = pausarTemporizador;
-      agregarMin.onclick = agregarUnMinuto;
-
-      div.append(
-        document.createTextNode("🎮 "),
-        numero,
-        document.createElement("br"),
-        minutosInput,
-        pagoInput,
-        iniciar,
-        pausar,
-        agregarMin,
-        document.createElement("br"),
-        tiempo
-      );
-
+      div.innerHTML = `
+        <h3>🎮 Consola ${num}</h3>
+        <input type="number" placeholder="Minutos" min="1" id="min${num}">
+        <input type="number" placeholder="Pago $" id="pago${num}">
+        <br>
+        <button onclick="iniciar(${num})">Iniciar</button>
+        <button onclick="pausar(${num})">⏸️</button>
+        <button onclick="agregarMinuto(${num})">➕1 min</button>
+        <p id="timer${num}">00:00</p>
+      `;
       contenedor.appendChild(div);
+    };
 
-      // Restaurar temporizador si existía
-      if (datos[index]) {
-        numero.value = datos[index].numero;
-        tiempoRestante = datos[index].tiempoRestante;
-        pausado = datos[index].pausado;
-        mostrarTiempo();
+    for (let i = 1; i <= 5; i++) crearConsola(i);
 
-        interval = setInterval(() => {
-          if (!pausado && tiempoRestante > 0) {
-            tiempoRestante--;
-            mostrarTiempo();
-            datos[index].tiempoRestante = tiempoRestante;
-            guardarDatos();
-            if (tiempoRestante === 0) {
-              alarma.play();
-              clearInterval(interval);
-            }
-          }
-        }, 1000);
-      }
+    const temporizadores = {};
+    const estados = {};
+
+    function iniciar(num) {
+      const minInput = document.getElementById(`min${num}`);
+      const pagoInput = document.getElementById(`pago${num}`);
+      let minutos = parseInt(minInput.value) || 0;
+      if (minutos <= 0) return alert("Minutos inválidos");
+
+      const inicio = new Date();
+      const duracion = minutos * 60;
+      let restante = duracion;
+      estados[num] = { pausado: false, restante, inicio: inicio.toLocaleTimeString(), pago: parseFloat(pagoInput.value || 0).toFixed(2) };
+
+      const actualizar = () => {
+        if (estados[num].pausado) return;
+        restante--;
+        estados[num].restante = restante;
+        const m = Math.floor(restante / 60).toString().padStart(2, "0");
+        const s = (restante % 60).toString().padStart(2, "0");
+        document.getElementById(`timer${num}`).textContent = `${m}:${s}`;
+        if (restante <= 0) {
+          clearInterval(temporizadores[num]);
+          sonido.play();
+          agregarFilaHistorial(num, estados[num].inicio, `${minutos} min`, estados[num].pago);
+          historial.push({ num, inicio: estados[num].inicio, duracion: `${minutos} min`, pago: estados[num].pago });
+          localStorage.setItem("historialConsolas", JSON.stringify(historial));
+        }
+      };
+
+      actualizar();
+      clearInterval(temporizadores[num]);
+      temporizadores[num] = setInterval(actualizar, 1000);
     }
 
-    for (let i = 0; i < maxConsolas; i++) {
-      crearConsola(i);
+    function pausar(num) {
+      if (!estados[num]) return;
+      estados[num].pausado = !estados[num].pausado;
     }
 
-    actualizarHistorial();
+    function agregarMinuto(num) {
+      if (!estados[num]) return;
+      estados[num].restante += 60;
+    }
   </script>
 </body>
 </html>
