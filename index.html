@@ -2,170 +2,184 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Control de Consolas</title>
+  <title>Control de Consolas y Ventas</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f0f0f0; }
-    .consola { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; background: #fff; }
-    .tabla { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    .tabla th, .tabla td { border: 1px solid #aaa; padding: 5px; text-align: center; }
-    .producto-form input { margin-right: 10px; }
+    table, th, td { border: 1px solid black; border-collapse: collapse; padding: 6px; }
+    .consola { margin-bottom: 20px; padding: 10px; border: 1px solid #333; }
+    .historial, .ventas, .registro, .corte { margin-top: 20px; }
     button { margin: 3px; }
   </style>
 </head>
 <body>
-  <h1>Control de Consolas</h1>
+  <h1>Control de Consolas y Ventas</h1>
+
   <div id="consolas"></div>
 
-  <h2>Registrar Venta</h2>
-  <div class="producto-form">
-    <input type="text" id="producto" placeholder="Producto">
-    <input type="number" id="precio" placeholder="Precio" step="0.01">
-    <input type="number" id="cantidad" placeholder="Cantidad">
+  <div class="registro">
+    <h3>Registrar venta</h3>
+    Producto: <input type="text" id="producto"><br>
+    Precio: <input type="number" id="precio"><br>
+    Cantidad: <input type="number" id="cantidad" value="1"><br>
     <button onclick="registrarVenta()">Registrar</button>
   </div>
 
-  <h2>Historial de Consolas</h2>
-  <table class="tabla">
-    <thead>
-      <tr><th>Consola</th><th>Tiempo</th><th>Pago</th><th>Fecha</th><th>Acciones</th></tr>
-    </thead>
-    <tbody id="historialTabla"></tbody>
-  </table>
+  <div class="ventas">
+    <h3>Historial de Productos Vendidos</h3>
+    <table id="tablaVentas">
+      <tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Total</th><th>Eliminar</th></tr>
+    </table>
+    <h4>Total ventas: $<span id="totalVentas">0</span></h4>
+  </div>
 
-  <h2>Ventas</h2>
-  <table class="tabla">
-    <thead>
-      <tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Total</th></tr>
-    </thead>
-    <tbody id="tablaVentas"></tbody>
-  </table>
-  <h3>Total Vendido: $<span id="totalVendido">0</span></h3>
+  <div class="historial">
+    <h3>Historial de Consolas</h3>
+    <table id="historialTabla">
+      <tr><th>Consola</th><th>Tiempo</th><th>Pago</th><th>Fecha</th><th>Eliminar</th></tr>
+    </table>
+  </div>
 
-  <button onclick="realizarCorte()">Realizar Corte del Día</button>
+  <div class="corte">
+    <button onclick="realizarCorte()">Corte del día</button>
+    <p id="resultadoCorte"></p>
+  </div>
 
-  <audio id="finSonido" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+  <audio id="sonidoFin">
+    <source src="https://www.soundjay.com/button/beep-07.wav" type="audio/wav">
+  </audio>
 
   <script>
-    const tiempos = {};
-    const historial = JSON.parse(localStorage.getItem("historial")) || [];
-    const ventas = JSON.parse(localStorage.getItem("ventas")) || [];
-    let totalVentas = calcularTotalVentas();
+    let tiempos = {};
+    let historial = [];
+    let ventas = [];
+
+    const historialTabla = document.getElementById("historialTabla");
+    const tablaVentas = document.getElementById("tablaVentas");
+    const totalVentas = document.getElementById("totalVentas");
 
     function crearConsolas() {
       const contenedor = document.getElementById("consolas");
       for (let i = 1; i <= 5; i++) {
         tiempos[i] = 0;
-        contenedor.innerHTML += `
-          <div class="consola">
-            <h3>Consola ${i}</h3>
-            <input type="number" id="tiempo${i}" placeholder="Minutos">
-            <button onclick="iniciarTemporizador(${i})">Iniciar</button>
-            <button onclick="agregarMinuto(${i})">+1 Min</button>
-            <span id="restante${i}"></span>
-          </div>
+        const div = document.createElement("div");
+        div.className = "consola";
+        div.innerHTML = `
+          <h3>Consola ${i}</h3>
+          Tiempo (min): <input type="number" id="tiempo${i}" value="0"><br>
+          <button onclick="iniciarTemporizador(${i})">Iniciar</button>
+          <button onclick="agregarMinuto(${i})">+1 min</button>
+          <p id="contador${i}">0 min restantes</p>
         `;
+        contenedor.appendChild(div);
       }
     }
 
-    function iniciarTemporizador(n) {
-      let minutos = parseInt(document.getElementById(`tiempo${n}`).value);
-      if (isNaN(minutos) || minutos <= 0) return alert("Ingrese minutos válidos");
-      tiempos[n] = minutos;
-      actualizarDisplay(n);
+    function iniciarTemporizador(num) {
+      const tiempoInput = document.getElementById(`tiempo${num}`);
+      let tiempo = parseInt(tiempoInput.value);
+      if (tiempo <= 0) return alert("Ingresa un tiempo válido");
+
+      tiempos[num] = tiempo;
+      actualizarContador(num);
+
       const intervalo = setInterval(() => {
-        if (tiempos[n] <= 0) {
+        tiempos[num]--;
+        actualizarContador(num);
+        if (tiempos[num] <= 0) {
           clearInterval(intervalo);
-          document.getElementById("finSonido").play();
-          agregarAHistorial(n);
-        } else {
-          tiempos[n]--;
-          actualizarDisplay(n);
+          agregarAHistorial(num);
+          reproducirSonido();
         }
       }, 60000);
     }
 
-    function agregarMinuto(n) {
-      tiempos[n]++;
-      actualizarDisplay(n);
+    function agregarMinuto(num) {
+      tiempos[num]++;
+      actualizarContador(num);
     }
 
-    function actualizarDisplay(n) {
-      document.getElementById(`restante${n}`).innerText = `Tiempo restante: ${tiempos[n]} min`;
+    function actualizarContador(num) {
+      document.getElementById(`contador${num}`).innerText = `${tiempos[num]} min restantes`;
     }
 
-    function agregarAHistorial(n) {
-      const tiempo = parseInt(document.getElementById(`tiempo${n}`).value);
-      const pago = (tiempo * 2).toFixed(2);
+    function agregarAHistorial(num) {
+      const tiempoUsado = document.getElementById(`tiempo${num}`).value;
+      const pago = tiempoUsado * 1; // puedes cambiar la tarifa
       const fecha = new Date().toLocaleString();
-      const entrada = { consola: n, tiempo, pago, fecha };
-      historial.push(entrada);
-      localStorage.setItem("historial", JSON.stringify(historial));
-      mostrarHistorial();
+      const id = Date.now() + Math.random();
+
+      historial.push({ id, consola: num, tiempo: tiempoUsado, pago, fecha });
+      actualizarHistorial();
     }
 
-    function mostrarHistorial() {
-      const tabla = document.getElementById("historialTabla");
-      tabla.innerHTML = "";
-      historial.forEach((entry, index) => {
-        tabla.innerHTML += `<tr>
-          <td>Consola ${entry.consola}</td>
-          <td>${entry.tiempo} min</td>
-          <td>$${entry.pago}</td>
-          <td>${entry.fecha}</td>
-          <td><button onclick="eliminarHistorial(${index})">Eliminar</button></td>
-        </tr>`;
+    function actualizarHistorial() {
+      historialTabla.innerHTML = `<tr><th>Consola</th><th>Tiempo</th><th>Pago</th><th>Fecha</th><th>Eliminar</th></tr>`;
+      historial.forEach(entry => {
+        historialTabla.innerHTML += `
+          <tr>
+            <td>Consola ${entry.consola}</td>
+            <td>${entry.tiempo} min</td>
+            <td>$${entry.pago}</td>
+            <td>${entry.fecha}</td>
+            <td><button onclick="eliminarHistorial(${entry.id})">❌</button></td>
+          </tr>`;
       });
     }
 
-    function eliminarHistorial(index) {
-      if (confirm("¿Eliminar este registro?")) {
-        historial.splice(index, 1);
-        localStorage.setItem("historial", JSON.stringify(historial));
-        mostrarHistorial();
-      }
+    function eliminarHistorial(id) {
+      historial = historial.filter(e => e.id !== id);
+      actualizarHistorial();
     }
 
     function registrarVenta() {
       const producto = document.getElementById("producto").value.trim();
       const precio = parseFloat(document.getElementById("precio").value);
       const cantidad = parseInt(document.getElementById("cantidad").value);
-      if (!producto || isNaN(precio) || isNaN(cantidad)) return alert("Completa todos los campos correctamente");
+      if (!producto || precio <= 0 || cantidad <= 0) return alert("Datos inválidos");
 
-      const total = (precio * cantidad).toFixed(2);
-      ventas.push({ producto, precio, cantidad, total });
-      localStorage.setItem("ventas", JSON.stringify(ventas));
-      mostrarVentas();
+      const total = precio * cantidad;
+      const id = Date.now() + Math.random();
+      ventas.push({ id, producto, precio, cantidad, total });
+      actualizarVentas();
     }
 
-    function mostrarVentas() {
-      const tabla = document.getElementById("tablaVentas");
-      tabla.innerHTML = "";
+    function actualizarVentas() {
+      let suma = 0;
+      tablaVentas.innerHTML = `<tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Total</th><th>Eliminar</th></tr>`;
       ventas.forEach(entry => {
-        tabla.innerHTML += `<tr>
-          <td>${entry.producto}</td>
-          <td>$${parseFloat(entry.precio).toFixed(2)}</td>
-          <td>${entry.cantidad}</td>
-          <td>$${entry.total}</td>
-        </tr>`;
+        tablaVentas.innerHTML += `
+          <tr>
+            <td>${entry.producto}</td>
+            <td>$${entry.precio}</td>
+            <td>${entry.cantidad}</td>
+            <td>$${entry.total}</td>
+            <td><button onclick="eliminarVenta(${entry.id})">❌</button></td>
+          </tr>`;
+        suma += entry.total;
       });
-      totalVentas = calcularTotalVentas();
-      document.getElementById("totalVendido").textContent = totalVentas.toFixed(2);
+      totalVentas.innerText = suma.toFixed(2);
     }
 
-    function calcularTotalVentas() {
-      return ventas.reduce((sum, entry) => sum + parseFloat(entry.total), 0);
+    function eliminarVenta(id) {
+      ventas = ventas.filter(v => v.id !== id);
+      actualizarVentas();
     }
 
     function realizarCorte() {
-      let totalTiempo = historial.reduce((s, e) => s + parseFloat(e.pago), 0);
-      let totalVenta = calcularTotalVentas();
-      alert(`Total por consolas: $${totalTiempo.toFixed(2)}\nTotal por productos: $${totalVenta.toFixed(2)}\nTOTAL DEL DÍA: $${(totalTiempo + totalVenta).toFixed(2)}`);
+      const totalHistorial = historial.reduce((suma, h) => suma + Number(h.pago), 0);
+      const totalProd = ventas.reduce((suma, v) => suma + v.total, 0);
+      const totalFinal = totalHistorial + totalProd;
+
+      document.getElementById("resultadoCorte").innerText = `
+        Total consolas: $${totalHistorial.toFixed(2)} | Total ventas: $${totalProd.toFixed(2)} | Total del día: $${totalFinal.toFixed(2)}
+      `;
+    }
+
+    function reproducirSonido() {
+      document.getElementById("sonidoFin").play();
     }
 
     window.onload = () => {
       crearConsolas();
-      mostrarHistorial();
-      mostrarVentas();
     };
   </script>
 </body>
