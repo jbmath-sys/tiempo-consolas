@@ -29,7 +29,7 @@
     .chip{background:#0f1530;border:1px solid rgba(255,255,255,.12);padding:10px 12px;border-radius:12px}
     .mono{font-variant-numeric: tabular-nums; font-feature-settings: "tnum" on;}
     .hint{color:var(--muted);font-size:12px}
-    #login{display:flex;align-items:center;justify-content:center;height:100vh}
+    #login{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
     #app{display:none}
     @media print{ body{background:white;color:black} .card{box-shadow:none;border:1px solid #ccc} .controls button{display:none} .hint{display:none} }
   </style>
@@ -37,12 +37,12 @@
 <body>
   <!-- Login -->
   <div id="login">
-    <div class="card p16" style="max-width:320px;width:100%">
+    <div class="card p16" style="max-width:360px;width:100%">
       <h2>Acceso</h2>
-      <label>Usuario <input id="luser" type="text"></label>
-      <label>Contraseña <input id="lpass" type="password"></label>
+      <label>Usuario <input id="luser" type="text" autocomplete="username"></label>
+      <label>Contraseña <input id="lpass" type="password" autocomplete="current-password"></label>
       <button id="btnLogin">Ingresar</button>
-      <p class="hint">Usuario: <b>admin</b> (para ti), <b>empleado</b> (para tu personal). Contraseñas: <b>1234</b> / <b>0000</b>.</p>
+      <p class="hint" style="margin-top:8px">Usuario: <b>admin</b> (para ti), <b>empleado</b> (para tu personal). Contraseñas: <b>1234</b> / <b>0000</b>.</p>
     </div>
   </div>
 
@@ -65,7 +65,7 @@
           <button id="exportar" class="ghost">Exportar CSV</button>
           <button id="reporte" class="ghost" style="display:none">Reporte</button>
         </div>
-        <p class="hint">Todo se guarda automáticamente por día en este navegador.</p>
+        <p class="hint">Todo se guarda automáticamente por fecha en este navegador.</p>
       </div>
 
       <div class="card p16" style="margin-top:16px">
@@ -117,100 +117,223 @@
   </div>
 
 <script>
-  // Usuarios
+(function(){
+  // ====== Usuarios (simple) ======
   const usuarios = { "admin":"1234", "empleado":"0000" };
   let usuarioActivo = null;
 
-  document.getElementById('btnLogin').addEventListener('click',()=>{
-    const u=document.getElementById('luser').value.trim();
-    const p=document.getElementById('lpass').value.trim();
+  // ====== Utils ======
+  const $ = s => document.querySelector(s);
+  const fmt = n => (Number(n)||0).toLocaleString('es-MX',{style:'currency',currency:'MXN'});
+  const keyFor = d => `ventas-${d}`;
+  function hoyISO(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+
+  // Estado
+  let registros = [];
+
+  // ====== Login ======
+  function onLogin(){
+    const u = $('#luser').value.trim();
+    const p = $('#lpass').value.trim();
     if(usuarios[u] && usuarios[u]===p){
-      usuarioActivo=u;
-      document.getElementById('activeUser').textContent=u;
-      document.getElementById('login').style.display='none';
-      document.getElementById('app').style.display='block';
-      if(u==='admin'){ document.getElementById('reporte').style.display='inline-block'; document.getElementById('panelReporte').style.display='block'; }
+      usuarioActivo = u;
+      $('#activeUser').textContent = u;
+      $('#login').style.display='none';
+      $('#app').style.display='block';
+      if(u==='admin'){ $('#reporte').style.display='inline-block'; $('#panelReporte').style.display='block'; }
       init();
-    }else alert('Usuario o contraseña incorrectos');
+    } else {
+      alert('Usuario o contraseña incorrectos');
+    }
+  }
+  $('#btnLogin').addEventListener('click', onLogin);
+  ['keydown'].forEach(evName=>{
+    document.addEventListener(evName, (e)=>{
+      if($('#login').style.display !== 'none' && e.key==='Enter') onLogin();
+    });
   });
 
-  // Utilidades
-  const $=s=>document.querySelector(s);
-  const fmt=n=>(Number(n)||0).toLocaleString('es-MX',{style:'currency',currency:'MXN'});
-  const keyFor=d=>`ventas-${d}`;
-  function hoyISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
+  // ====== Cargar/Guardar ======
+  function cargar(dia){
+    const raw = localStorage.getItem(keyFor(dia));
+    registros = raw ? JSON.parse(raw) : [];
+    render();
+  }
+  function guardar(){
+    const dia = $('#fecha').value;
+    localStorage.setItem(keyFor(dia), JSON.stringify(registros));
+  }
 
-  let registros=[];
-
-  function cargar(dia){const raw=localStorage.getItem(keyFor(dia));registros=raw?JSON.parse(raw):[];render();}
-  function guardar(){const dia=$('#fecha').value;localStorage.setItem(keyFor(dia),JSON.stringify(registros));}
-
+  // ====== Render ======
   function render(){
-    const tbody=$('#tabla tbody');tbody.innerHTML='';
+    const tbody = $('#tabla tbody'); tbody.innerHTML='';
     let tV=0,tA=0,tC=0;
     registros.forEach((r,i)=>{
-      const pagado=(Number(r.importe)||0)-(Number(r.adeudo)||0);
-      tV+=Number(r.importe)||0;tA+=Number(r.adeudo)||0;tC+=pagado;
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${i+1}</td><td><input class="cell" type="time" value="${r.inicio||''}" data-idx="${i}" data-k="inicio"></td>
-      <td><input class="cell" type="time" value="${r.termino||''}" data-idx="${i}" data-k="termino"></td>
-      <td><input class="cell" type="text" value="${r.concepto||''}" data-idx="${i}" data-k="concepto"></td>
-      <td class="right"><input class="cell" style="text-align:right" type="number" step="0.01" value="${r.importe||0}" data-idx="${i}" data-k="importe"></td>
-      <td class="right"><input class="cell" style="text-align:right" type="number" step="0.01" value="${r.adeudo||0}" data-idx="${i}" data-k="adeudo"></td>
-      <td class="right mono">${fmt(pagado)}</td>
-      <td>${r.usuario||''}</td>
-      <td><button data-del="${i}">✕</button></td>`;
+      const pagado = (Number(r.importe)||0)-(Number(r.adeudo)||0);
+      tV += Number(r.importe)||0; tA += Number(r.adeudo)||0; tC += pagado;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td><input class="cell" type="time" value="${r.inicio||''}" data-idx="${i}" data-k="inicio"></td>
+        <td><input class="cell" type="time" value="${r.termino||''}" data-idx="${i}" data-k="termino"></td>
+        <td><input class="cell" type="text" value="${r.concepto||''}" data-idx="${i}" data-k="concepto"></td>
+        <td class="right"><input class="cell" style="text-align:right" type="number" step="0.01" value="${r.importe||0}" data-idx="${i}" data-k="importe"></td>
+        <td class="right"><input class="cell" style="text-align:right" type="number" step="0.01" value="${r.adeudo||0}" data-idx="${i}" data-k="adeudo"></td>
+        <td class="right mono">${fmt(pagado)}</td>
+        <td>${r.usuario||''}</td>
+        <td class="right"><button data-del="${i}" title="Eliminar">✕</button></td>
+      `;
       tbody.appendChild(tr);
     });
-    $('#tVentas').textContent=fmt(tV);
-    $('#tAdeudos').textContent=fmt(tA);
-    $('#tCobrado').textContent=fmt(tC);
-    $('#tFilas').textContent=registros.length;
+    $('#tVentas').textContent = fmt(tV);
+    $('#tAdeudos').textContent = fmt(tA);
+    $('#tCobrado').textContent = fmt(tC);
+    $('#tFilas').textContent = registros.length;
   }
 
+  // ====== Agregar fila ======
   function add(){
-    const r={inicio:$('#inicio').value||'',termino:$('#termino').value||'',concepto:$('#concepto').value.trim(),
-      importe:Number($('#importe').value)||0,adeudo:Number($('#adeudo').value)||0,usuario:usuarioActivo};
-    registros.push(r);guardar();
-    ['concepto','importe','adeudo','inicio','termino'].forEach(id=>$('#'+id).value=(id==='adeudo'?0:''));render();
+    const r = {
+      inicio: $('#inicio').value || '',
+      termino: $('#termino').value || '',
+      concepto: $('#concepto').value.trim(),
+      importe: Number($('#importe').value)||0,
+      adeudo: Number($('#adeudo').value)||0,
+      usuario: usuarioActivo
+    };
+    registros.push(r);
+    guardar();
+    ['concepto','importe','adeudo','inicio','termino'].forEach(id=>$('#'+id).value = (id==='adeudo'?0:''));
+    render();
+    $('#concepto').focus();
   }
 
+  // ====== Exportar día ======
+  function esc(s){ if(s==null) return ''; s=String(s); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+  function descargar(contenido, nombre, tipo){
+    const blob = new Blob([contenido], {type: tipo});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=nombre; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  }
   function exportar(){
-    const dia=$('#fecha').value;
-    const enc=['inicio','termino','concepto','importe','adeudo','pagado','usuario'];
-    const filas=registros.map(r=>{const pag=(Number(r.importe)||0)-(Number(r.adeudo)||0);
-      return [r.inicio||'',r.termino||'',esc(r.concepto||''),(Number(r.importe)||0).toFixed(2),(Number(r.adeudo)||0).toFixed(2),pag.toFixed(2),r.usuario||''].join(',');});
-    descargar([enc.join(','),...filas].join('\\n'),`ventas-${dia}.csv`,'text/csv');
+    const dia = $('#fecha').value;
+    const enc = ['inicio','termino','concepto','importe','adeudo','pagado','usuario'];
+    const filas = registros.map(r=>{
+      const pag = (Number(r.importe)||0)-(Number(r.adeudo)||0);
+      return [r.inicio||'', r.termino||'', esc(r.concepto||''), (Number(r.importe)||0).toFixed(2), (Number(r.adeudo)||0).toFixed(2), pag.toFixed(2), r.usuario||''].join(',');
+    });
+    const csv = [enc.join(','), ...filas].join('\n');
+    descargar(csv, `ventas-${dia}.csv`, 'text/csv');
   }
 
-  // Reporte admin
-  function fechasRango(desde,hasta){const out=[];if(!desde||!hasta)return out;const a=new Date(desde),b=new Date(hasta);
-    for(let d=new Date(a);d<=b;d.setDate(d.getDate()+1)){d.setMinutes(d.getMinutes()-d.getTimezoneOffset());out.push(d.toISOString().slice(0,10));}return out;}
-  function leerDia(d){const raw=localStorage.getItem(keyFor(d));return raw?JSON.parse(raw).map(x=>({...x,_fecha:d})):[];}
+  // ====== Auto-export a medianoche ======
+  let timerAuto=null;
+  function scheduleAutoExport(){
+    if(timerAuto) clearTimeout(timerAuto);
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(24,0,5,0); // 00:00:05
+    const delay = Math.max(1000, next - now);
+    timerAuto = setTimeout(()=>{
+      try{ if(registros && registros.length){ exportar(); } }catch(e){ console.warn(e); }
+      scheduleAutoExport();
+    }, delay);
+  }
+
+  // ====== Reporte (admin) ======
+  function fechasRango(desde,hasta){
+    const out=[]; if(!desde||!hasta) return out;
+    const a=new Date(desde), b=new Date(hasta);
+    for(let d=new Date(a); d<=b; d.setDate(d.getDate()+1)){
+      d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+      out.push(d.toISOString().slice(0,10));
+    }
+    return out;
+  }
+  function leerDia(dia){
+    const raw = localStorage.getItem(keyFor(dia));
+    return raw ? JSON.parse(raw).map(x=>({ ...x, _fecha: dia })) : [];
+  }
   function generarReporte(){
-    const desde=$('#repDesde').value||hoyISO();const hasta=$('#repHasta').value||hoyISO();const u=$('#repUsuario').value.trim();
-    let rows=fechasRango(desde,hasta).flatMap(leerDia);if(u)rows=rows.filter(r=>(r.usuario||'')===u);
-    let tV=0,tA=0,tC=0;rows.forEach(r=>{tV+=Number(r.importe)||0;tA+=Number(r.adeudo)||0;tC+=(Number(r.importe)||0)-(Number(r.adeudo)||0);});
-    $('#repTotalVentas').textContent=fmt(tV);$('#repTotalAdeudos').textContent=fmt(tA);$('#repTotalCobrado').textContent=fmt(tC);$('#repFilas').textContent=rows.length;
-    const tb=$('#repTbody');tb.innerHTML='';rows.forEach(r=>{const pag=(Number(r.importe)||0)-(Number(r.adeudo)||0);
-      tb.innerHTML+=`<tr><td>${r._fecha}</td><td>${r.inicio||''}</td><td>${r.termino||''}</td><td>${r.concepto||''}</td><td class='right'>${(Number(r.importe)||0).toFixed(2)}</td><td class='right'>${(Number(r.adeudo)||0).toFixed(2)}</td><td class='right'>${pag.toFixed(2)}</td><td>${r.usuario||''}</td></tr>`;});
-    window.__repRows=rows;window.__repDesde=desde;window.__repHasta=hasta;window.__repUsuario=u;
+    const desde = $('#repDesde').value || hoyISO();
+    const hasta = $('#repHasta').value || hoyISO();
+    const u = ($('#repUsuario')?.value || '').trim();
+    let rows = fechasRango(desde,hasta).flatMap(leerDia);
+    if(u) rows = rows.filter(r => (r.usuario||'')===u);
+
+    let tV=0,tA=0,tC=0;
+    rows.forEach(r=>{ tV+=Number(r.importe)||0; tA+=Number(r.adeudo)||0; tC+=((Number(r.importe)||0)-(Number(r.adeudo)||0)); });
+    $('#repTotalVentas').textContent = fmt(tV);
+    $('#repTotalAdeudos').textContent = fmt(tA);
+    $('#repTotalCobrado').textContent = fmt(tC);
+    $('#repFilas').textContent = rows.length;
+
+    const tb = $('#repTbody'); tb.innerHTML='';
+    rows.forEach(r=>{
+      const pag = (Number(r.importe)||0)-(Number(r.adeudo)||0);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${r._fecha}</td><td>${r.inicio||''}</td><td>${r.termino||''}</td><td>${r.concepto||''}</td><td class="right">${(Number(r.importe)||0).toFixed(2)}</td><td class="right">${(Number(r.adeudo)||0).toFixed(2)}</td><td class="right">${pag.toFixed(2)}</td><td>${r.usuario||''}</td>`;
+      tb.appendChild(tr);
+    });
+
+    // Guardar para exportar
+    window.__repRows = rows;
+    window.__repDesde = desde; window.__repHasta = hasta; window.__repUsuario = u;
   }
   function exportarReporte(){
-    const enc=['fecha','inicio','termino','concepto','importe','adeudo','pagado','usuario'];
-    const filas=(window.__repRows||[]).map(r=>{const p=(Number(r.importe)||0)-(Number(r.adeudo)||0);
-      return [r._fecha,r.inicio||'',r.termino||'',esc(r.concepto||''),(Number(r.importe)||0).toFixed(2),(Number(r.adeudo)||0).toFixed(2),p.toFixed(2),r.usuario||''].join(',');});
-    const u=window.__repUsuario?`-${window.__repUsuario}`:'';descargar([enc.join(','),...filas].join('\\n'),`reporte${u}-${window.__repDesde}_a_${window.__repHasta}.csv`,'text/csv');
+    const enc = ['fecha','inicio','termino','concepto','importe','adeudo','pagado','usuario'];
+    const filas = (window.__repRows||[]).map(r=>{
+      const pag=(Number(r.importe)||0)-(Number(r.adeudo)||0);
+      return [r._fecha, r.inicio||'', r.termino||'', esc(r.concepto||''), (Number(r.importe)||0).toFixed(2), (Number(r.adeudo)||0).toFixed(2), pag.toFixed(2), r.usuario||''].join(',');
+    });
+    const suf = window.__repUsuario ? `-${window.__repUsuario}` : '';
+    descargar([enc.join(','), ...filas].join('\n'), `reporte${suf}-${window.__repDesde}_a_${window.__repHasta}.csv`, 'text/csv');
   }
 
-  // Helpers
-  function esc(s){if(s==null)return'';s=String(s);return /[\",\\n]/.test(s)?'\"'+s.replace(/\"/g,'\"\"')+'\"':s;}
-  function descargar(con,n,t){const b=new Blob([con],{type:t});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=n;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
-  function sum(k){return registros.reduce((a,r)=>a+(Number(r[k])||0),0);}
+  // ====== Eventos UI ======
+  document.addEventListener('input', (ev)=>{
+    const t = ev.target;
+    if(t.matches('input.cell')){
+      const i = Number(t.dataset.idx); const k = t.dataset.k;
+      if(!Number.isNaN(i) && registros[i]){
+        registros[i][k] = (t.type==='number') ? Number(t.value) : t.value;
+        guardar();
+        render();
+      }
+    }
+  });
+  document.addEventListener('click', (ev)=>{
+    const t = ev.target;
+    if(t.id==='agregar') add();
+    if(t.id==='exportar') exportar();
+    if(t.id==='reporte'){ const p=$('#panelReporte'); if(p){ p.style.display='block'; p.scrollIntoView({behavior:'smooth'}); } }
+    if(t.id==='repGenerar') generarReporte();
+    if(t.id==='repExportar') exportarReporte();
+    if(t.id==='limpiarDia'){
+      if(confirm('¿Vaciar todos los registros de este día?')){ registros=[]; guardar(); render(); }
+    }
+    if(t.dataset && t.dataset.del){
+      const i = Number(t.dataset.del);
+      registros.splice(i,1); guardar(); render();
+    }
+  });
+  $('#fecha')?.addEventListener('change',()=>cargar($('#fecha').value));
 
-  // Auto export a medianoche
-  let timer=null;function scheduleAutoExport(){if(timer)clearTimeout(timer);const now=new Date();const next=new Date(now);next.setHours(24,0,5,0);const delay=Math.max(1000,next-now);
-    timer=setTimeout(()=>{try{if(registros.length)exportar();}catch(e){}scheduleAutoExport();},delay);}
+  // ====== Init tras login ======
+  function init(){
+    $('#fecha').value = hoyISO();
+    cargar($('#fecha').value);
+    scheduleAutoExport();
 
-  // Eventos
-  document.addEventListener('input',ev=>{const t=ev.target;if(t.matches('input.cell')){const i=Number(t.dataset.idx),k=t.dataset.k;if(!isNaN(i)&&registros[i]){registros[i][k]=(t.type==='number
+    // Prellenar rango reporte semana actual
+    const today = hoyISO();
+    const d = new Date(today); d.setDate(d.getDate()-6); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+    if($('#repDesde')) $('#repDesde').value = d.toISOString().slice(0,10);
+    if($('#repHasta')) $('#repHasta').value = today;
+    if(usuarioActivo==='admin') generarReporte();
+  }
+})();
+</script>
+</body>
+</html>
