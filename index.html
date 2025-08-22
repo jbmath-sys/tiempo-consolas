@@ -1,174 +1,216 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control de Consolas y Ventas</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Registro de Ventas Diario</title>
   <style>
-    body { font-family: Arial; }
-    .consola { border: 1px solid #222; padding: 10px; margin-bottom: 10px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    .boton { margin-right: 5px; }
+    :root { --bg:#0b1020; --card:#121935; --muted:#9fb0ff; --text:#eaf0ff; --accent:#5b7cfa; --ok:#17b890; --warn:#ffb703; --danger:#ef476f; }
+    html,body{height:100%;margin:0;font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial;}
+    body{background:linear-gradient(135deg,#0b1020,#131a35 60%,#0b1020);color:var(--text);}
+    .wrap{max-width:1100px;margin:24px auto;padding:16px;}
+    h1{font-weight:800;letter-spacing:.3px;margin:0 0 6px}
+    .sub{color:var(--muted);margin:0 0 18px}
+    .card{background:rgba(255,255,255,.04);backdrop-filter: blur(6px);border:1px solid rgba(255,255,255,.1);border-radius:16px;box-shadow:0 6px 30px rgba(0,0,0,.35)}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .p16{padding:16px}
+    .controls label{display:flex;flex-direction:column;font-size:12px;color:var(--muted)}
+    .controls input[type="date"], .controls input[type="time"], .controls input[type="text"], .controls input[type="number"], .controls input[type="password"]{background:#0f1530;border:1px solid rgba(255,255,255,.12);color:var(--text);padding:10px;border-radius:10px;min-width:140px}
+    .controls button{background:var(--accent);color:white;border:0;padding:10px 14px;border-radius:12px;font-weight:700;cursor:pointer}
+    .controls button.ghost{background:transparent;border:1px solid rgba(255,255,255,.25)}
+    .controls button.danger{background:var(--danger)}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid rgba(255,255,255,.12);padding:10px;vertical-align:middle}
+    th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+    tbody tr:hover{background:rgba(255,255,255,.03)}
+    input.cell{width:100%;background:#0f1530;border:1px solid rgba(255,255,255,.12);color:var(--text);padding:8px;border-radius:8px}
+    .right{text-align:right}
+    .totalbar{display:flex;gap:16px;flex-wrap:wrap}
+    .chip{background:#0f1530;border:1px solid rgba(255,255,255,.12);padding:10px 12px;border-radius:12px}
+    .mono{font-variant-numeric: tabular-nums; font-feature-settings: "tnum" on;}
+    .hint{color:var(--muted);font-size:12px}
+    #login{display:flex;align-items:center;justify-content:center;height:100vh}
+    #app{display:none}
+    @media print{ body{background:white;color:black} .card{box-shadow:none;border:1px solid #ccc} .controls button{display:none} .hint{display:none} }
   </style>
 </head>
 <body>
+  <!-- Login -->
+  <div id="login">
+    <div class="card p16" style="max-width:320px;width:100%">
+      <h2>Acceso</h2>
+      <label>Usuario <input id="luser" type="text"></label>
+      <label>Contraseña <input id="lpass" type="password"></label>
+      <button id="btnLogin">Ingresar</button>
+      <p class="hint">Usuario: <b>admin</b> (para ti), <b>empleado</b> (para tu personal). Contraseñas: <b>1234</b> / <b>0000</b>.</p>
+    </div>
+  </div>
 
-  <h1>Control de Consolas</h1>
-  <div id="consolas"></div>
+  <!-- App -->
+  <div id="app">
+    <div class="wrap">
+      <h1>Registro de Ventas Diario</h1>
+      <p class="sub">Usuario activo: <span id="activeUser"></span></p>
 
-  <h2>Registrar Venta</h2>
-  <input type="text" id="producto" placeholder="Producto">
-  <input type="number" id="precio" placeholder="Precio">
-  <input type="number" id="cantidad" placeholder="Cantidad">
-  <button onclick="registrarVenta()">Agregar</button>
+      <div class="card p16 controls">
+        <div class="row" style="align-items:flex-end">
+          <label>Fecha<input id="fecha" type="date" /></label>
+          <label>Inicio<input id="inicio" type="time" /></label>
+          <label>Término<input id="termino" type="time" /></label>
+          <label>Producto / Concepto<input id="concepto" type="text" placeholder="Consola 1, Pan, Recarga, etc." /></label>
+          <label>$ Importe<input id="importe" type="number" step="0.01" inputmode="decimal" /></label>
+          <label>Adeudo<input id="adeudo" type="number" step="0.01" inputmode="decimal" value="0" /></label>
+          <button id="agregar">Agregar</button>
+          <button id="limpiarDia" class="ghost">Vaciar día</button>
+          <button id="exportar" class="ghost">Exportar CSV</button>
+          <button id="reporte" class="ghost" style="display:none">Reporte</button>
+        </div>
+        <p class="hint">Todo se guarda automáticamente por día en este navegador.</p>
+      </div>
 
-  <h2>Ventas</h2>
-  <table>
-    <thead><tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Total</th><th>Acciones</th></tr></thead>
-    <tbody id="tablaVentas"></tbody>
-    <tfoot><tr><td colspan="3"><strong>Total Vendido</strong></td><td colspan="2" id="totalVentas">$0</td></tr></tfoot>
-  </table>
+      <div class="card p16" style="margin-top:16px">
+        <table id="tabla">
+          <thead>
+            <tr>
+              <th>#</th><th>Inicio</th><th>Término</th><th>Concepto</th>
+              <th class="right">$ Importe</th><th class="right">$ Adeudo</th><th class="right">$ Pagado</th><th>Usuario</th><th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
 
-  <h2>Historial</h2>
-  <table>
-    <thead><tr><th>Consola</th><th>Tiempo</th><th>Pago</th><th>Fecha</th><th>Acciones</th></tr></thead>
-    <tbody id="historialTabla"></tbody>
-  </table>
-  <button onclick="corteDelDia()">Corte del Día</button>
-  <p id="totalDia"></p>
+      <div class="card p16" style="margin-top:16px">
+        <div class="totalbar">
+          <div class="chip">Ventas brutas: <b class="mono" id="tVentas">$0.00</b></div>
+          <div class="chip">Pagado: <b class="mono" id="tCobrado">$0.00</b></div>
+          <div class="chip">Adeudos: <b class="mono" id="tAdeudos">$0.00</b></div>
+          <div class="chip">Registros: <b id="tFilas">0</b></div>
+        </div>
+      </div>
 
-  <audio id="alarma" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+      <!-- Reporte admin -->
+      <div id="panelReporte" class="card p16" style="margin-top:16px; display:none">
+        <h3>Reporte por usuario y rango de fechas</h3>
+        <div class="row" style="align-items:flex-end">
+          <label>Desde<input id="repDesde" type="date"></label>
+          <label>Hasta<input id="repHasta" type="date"></label>
+          <label>Usuario<input id="repUsuario" list="repUsers" placeholder="admin | empleado | (vacío = todos)"></label>
+          <datalist id="repUsers"><option value="admin"><option value="empleado"></datalist>
+          <button id="repGenerar">Generar</button>
+          <button id="repExportar" class="ghost">Exportar CSV</button>
+        </div>
+        <div class="totalbar" style="margin-top:12px">
+          <div class="chip">Total ventas: <b class="mono" id="repTotalVentas">$0.00</b></div>
+          <div class="chip">Total cobrado: <b class="mono" id="repTotalCobrado">$0.00</b></div>
+          <div class="chip">Total adeudos: <b class="mono" id="repTotalAdeudos">$0.00</b></div>
+          <div class="chip">Registros: <b id="repFilas">0</b></div>
+        </div>
+        <div style="overflow:auto;max-height:420px;margin-top:10px">
+          <table style="width:100%">
+            <thead><tr><th>Fecha</th><th>Inicio</th><th>Término</th><th>Concepto</th><th class="right">Importe</th><th class="right">Adeudo</th><th class="right">Pagado</th><th>Usuario</th></tr></thead>
+            <tbody id="repTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <script>
-    const precios = 5;
-    let tiempos = {};
-    let intervalos = {};
-    let historial = [];
-    let ventas = [];
+<script>
+  // Usuarios
+  const usuarios = { "admin":"1234", "empleado":"0000" };
+  let usuarioActivo = null;
 
-    function crearConsolas() {
-      const contenedor = document.getElementById("consolas");
-      for (let i = 1; i <= 5; i++) {
-        tiempos[i] = 0;
-        const div = document.createElement("div");
-        div.className = "consola";
-        div.innerHTML = `
-          <h3>Consola ${i}</h3>
-          <p>Minutos: <span id="tiempo${i}">0</span></p>
-          <button class="boton" onclick="agregarTiempo(${i})">Iniciar</button>
-          <button class="boton" onclick="sumarUnMinuto(${i})">+1 Min</button>
-          <button class="boton" onclick="pausarTiempo(${i})">Pausar</button>
-          <button class="boton" onclick="detenerTiempo(${i})">Detener</button>
-          <button class="boton" onclick="eliminarTiempo(${i})">Eliminar Tiempo</button>
-        `;
-        contenedor.appendChild(div);
-      }
-    }
+  document.getElementById('btnLogin').addEventListener('click',()=>{
+    const u=document.getElementById('luser').value.trim();
+    const p=document.getElementById('lpass').value.trim();
+    if(usuarios[u] && usuarios[u]===p){
+      usuarioActivo=u;
+      document.getElementById('activeUser').textContent=u;
+      document.getElementById('login').style.display='none';
+      document.getElementById('app').style.display='block';
+      if(u==='admin'){ document.getElementById('reporte').style.display='inline-block'; document.getElementById('panelReporte').style.display='block'; }
+      init();
+    }else alert('Usuario o contraseña incorrectos');
+  });
 
-    function actualizarTiempo(consola) {
-      document.getElementById(`tiempo${consola}`).textContent = tiempos[consola];
-    }
+  // Utilidades
+  const $=s=>document.querySelector(s);
+  const fmt=n=>(Number(n)||0).toLocaleString('es-MX',{style:'currency',currency:'MXN'});
+  const keyFor=d=>`ventas-${d}`;
+  function hoyISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
 
-    function agregarTiempo(consola) {
-      if (intervalos[consola]) return;
-      intervalos[consola] = setInterval(() => {
-        tiempos[consola]++;
-        actualizarTiempo(consola);
-        if (tiempos[consola] === 60) document.getElementById("alarma").play();
-      }, 60000);
-    }
+  let registros=[];
 
-    function sumarUnMinuto(consola) {
-      tiempos[consola]++;
-      actualizarTiempo(consola);
-    }
+  function cargar(dia){const raw=localStorage.getItem(keyFor(dia));registros=raw?JSON.parse(raw):[];render();}
+  function guardar(){const dia=$('#fecha').value;localStorage.setItem(keyFor(dia),JSON.stringify(registros));}
 
-    function pausarTiempo(consola) {
-      clearInterval(intervalos[consola]);
-      intervalos[consola] = null;
-    }
+  function render(){
+    const tbody=$('#tabla tbody');tbody.innerHTML='';
+    let tV=0,tA=0,tC=0;
+    registros.forEach((r,i)=>{
+      const pagado=(Number(r.importe)||0)-(Number(r.adeudo)||0);
+      tV+=Number(r.importe)||0;tA+=Number(r.adeudo)||0;tC+=pagado;
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${i+1}</td><td><input class="cell" type="time" value="${r.inicio||''}" data-idx="${i}" data-k="inicio"></td>
+      <td><input class="cell" type="time" value="${r.termino||''}" data-idx="${i}" data-k="termino"></td>
+      <td><input class="cell" type="text" value="${r.concepto||''}" data-idx="${i}" data-k="concepto"></td>
+      <td class="right"><input class="cell" style="text-align:right" type="number" step="0.01" value="${r.importe||0}" data-idx="${i}" data-k="importe"></td>
+      <td class="right"><input class="cell" style="text-align:right" type="number" step="0.01" value="${r.adeudo||0}" data-idx="${i}" data-k="adeudo"></td>
+      <td class="right mono">${fmt(pagado)}</td>
+      <td>${r.usuario||''}</td>
+      <td><button data-del="${i}">✕</button></td>`;
+      tbody.appendChild(tr);
+    });
+    $('#tVentas').textContent=fmt(tV);
+    $('#tAdeudos').textContent=fmt(tA);
+    $('#tCobrado').textContent=fmt(tC);
+    $('#tFilas').textContent=registros.length;
+  }
 
-    function detenerTiempo(consola) {
-      if (tiempos[consola] > 0) agregarAHistorial(consola);
-      clearInterval(intervalos[consola]);
-      tiempos[consola] = 0;
-      actualizarTiempo(consola);
-      intervalos[consola] = null;
-    }
+  function add(){
+    const r={inicio:$('#inicio').value||'',termino:$('#termino').value||'',concepto:$('#concepto').value.trim(),
+      importe:Number($('#importe').value)||0,adeudo:Number($('#adeudo').value)||0,usuario:usuarioActivo};
+    registros.push(r);guardar();
+    ['concepto','importe','adeudo','inicio','termino'].forEach(id=>$('#'+id).value=(id==='adeudo'?0:''));render();
+  }
 
-    function eliminarTiempo(consola) {
-      clearInterval(intervalos[consola]);
-      tiempos[consola] = 0;
-      actualizarTiempo(consola);
-      intervalos[consola] = null;
-    }
+  function exportar(){
+    const dia=$('#fecha').value;
+    const enc=['inicio','termino','concepto','importe','adeudo','pagado','usuario'];
+    const filas=registros.map(r=>{const pag=(Number(r.importe)||0)-(Number(r.adeudo)||0);
+      return [r.inicio||'',r.termino||'',esc(r.concepto||''),(Number(r.importe)||0).toFixed(2),(Number(r.adeudo)||0).toFixed(2),pag.toFixed(2),r.usuario||''].join(',');});
+    descargar([enc.join(','),...filas].join('\\n'),`ventas-${dia}.csv`,'text/csv');
+  }
 
-    function agregarAHistorial(consola) {
-      const tiempo = tiempos[consola];
-      const pago = tiempo * precios;
-      const fecha = new Date().toLocaleString();
-      historial.push({ consola, tiempo, pago, fecha });
-      actualizarHistorial();
-    }
+  // Reporte admin
+  function fechasRango(desde,hasta){const out=[];if(!desde||!hasta)return out;const a=new Date(desde),b=new Date(hasta);
+    for(let d=new Date(a);d<=b;d.setDate(d.getDate()+1)){d.setMinutes(d.getMinutes()-d.getTimezoneOffset());out.push(d.toISOString().slice(0,10));}return out;}
+  function leerDia(d){const raw=localStorage.getItem(keyFor(d));return raw?JSON.parse(raw).map(x=>({...x,_fecha:d})):[];}
+  function generarReporte(){
+    const desde=$('#repDesde').value||hoyISO();const hasta=$('#repHasta').value||hoyISO();const u=$('#repUsuario').value.trim();
+    let rows=fechasRango(desde,hasta).flatMap(leerDia);if(u)rows=rows.filter(r=>(r.usuario||'')===u);
+    let tV=0,tA=0,tC=0;rows.forEach(r=>{tV+=Number(r.importe)||0;tA+=Number(r.adeudo)||0;tC+=(Number(r.importe)||0)-(Number(r.adeudo)||0);});
+    $('#repTotalVentas').textContent=fmt(tV);$('#repTotalAdeudos').textContent=fmt(tA);$('#repTotalCobrado').textContent=fmt(tC);$('#repFilas').textContent=rows.length;
+    const tb=$('#repTbody');tb.innerHTML='';rows.forEach(r=>{const pag=(Number(r.importe)||0)-(Number(r.adeudo)||0);
+      tb.innerHTML+=`<tr><td>${r._fecha}</td><td>${r.inicio||''}</td><td>${r.termino||''}</td><td>${r.concepto||''}</td><td class='right'>${(Number(r.importe)||0).toFixed(2)}</td><td class='right'>${(Number(r.adeudo)||0).toFixed(2)}</td><td class='right'>${pag.toFixed(2)}</td><td>${r.usuario||''}</td></tr>`;});
+    window.__repRows=rows;window.__repDesde=desde;window.__repHasta=hasta;window.__repUsuario=u;
+  }
+  function exportarReporte(){
+    const enc=['fecha','inicio','termino','concepto','importe','adeudo','pagado','usuario'];
+    const filas=(window.__repRows||[]).map(r=>{const p=(Number(r.importe)||0)-(Number(r.adeudo)||0);
+      return [r._fecha,r.inicio||'',r.termino||'',esc(r.concepto||''),(Number(r.importe)||0).toFixed(2),(Number(r.adeudo)||0).toFixed(2),p.toFixed(2),r.usuario||''].join(',');});
+    const u=window.__repUsuario?`-${window.__repUsuario}`:'';descargar([enc.join(','),...filas].join('\\n'),`reporte${u}-${window.__repDesde}_a_${window.__repHasta}.csv`,'text/csv');
+  }
 
-    function actualizarHistorial() {
-      historialTabla.innerHTML = "";
-      historial.forEach((entry, index) => {
-        historialTabla.innerHTML += `<tr><td>Consola ${entry.consola}</td><td>${entry.tiempo} min</td><td>$${entry.pago}</td><td>${entry.fecha}</td><td><button onclick="eliminarHistorial(${index})">Eliminar</button></td></tr>`;
-      });
-    }
+  // Helpers
+  function esc(s){if(s==null)return'';s=String(s);return /[\",\\n]/.test(s)?'\"'+s.replace(/\"/g,'\"\"')+'\"':s;}
+  function descargar(con,n,t){const b=new Blob([con],{type:t});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=n;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+  function sum(k){return registros.reduce((a,r)=>a+(Number(r[k])||0),0);}
 
-    function eliminarHistorial(index) {
-      historial.splice(index, 1);
-      actualizarHistorial();
-    }
+  // Auto export a medianoche
+  let timer=null;function scheduleAutoExport(){if(timer)clearTimeout(timer);const now=new Date();const next=new Date(now);next.setHours(24,0,5,0);const delay=Math.max(1000,next-now);
+    timer=setTimeout(()=>{try{if(registros.length)exportar();}catch(e){}scheduleAutoExport();},delay);}
 
-    function registrarVenta() {
-      const producto = document.getElementById("producto").value;
-      const precio = parseFloat(document.getElementById("precio").value);
-      const cantidad = parseInt(document.getElementById("cantidad").value);
-      if (!producto || isNaN(precio) || isNaN(cantidad)) return alert("Datos incorrectos");
-      const total = precio * cantidad;
-      ventas.push({ producto, precio, cantidad, total });
-      actualizarVentas();
-    }
-
-    function actualizarVentas() {
-      tablaVentas.innerHTML = "";
-      let sumaTotal = 0;
-      ventas.forEach((v, index) => {
-        sumaTotal += v.total;
-        tablaVentas.innerHTML += `<tr><td>${v.producto}</td><td>$${v.precio}</td><td>${v.cantidad}</td><td>$${v.total}</td><td><button onclick="eliminarVenta(${index})">Eliminar</button></td></tr>`;
-      });
-      document.getElementById("totalVentas").textContent = "$" + sumaTotal;
-    }
-
-    function eliminarVenta(index) {
-      ventas.splice(index, 1);
-      actualizarVentas();
-    }
-
-    function corteDelDia() {
-      let total = historial.reduce((acc, cur) => acc + cur.pago, 0);
-      document.getElementById("totalDia").textContent = `Total del día por consolas: $${total}`;
-    }
-
-    function cargarHistorial() {
-      actualizarHistorial();
-      actualizarVentas();
-    }
-
-    window.onload = () => {
-      crearConsolas();
-      cargarHistorial();
-      window.addEventListener("beforeunload", () => {
-        for (let i = 1; i <= 5; i++) {
-          if (tiempos[i] > 0) agregarAHistorial(i);
-        }
-      });
-    };
-  </script>
-
-</body>
-</html>
+  // Eventos
+  document.addEventListener('input',ev=>{const t=ev.target;if(t.matches('input.cell')){const i=Number(t.dataset.idx),k=t.dataset.k;if(!isNaN(i)&&registros[i]){registros[i][k]=(t.type==='number
