@@ -7,7 +7,7 @@
   <style>
     :root { --bg:#0b1020; --card:#121935; --muted:#9fb0ff; --text:#eaf0ff; --accent:#5b7cfa; --ok:#17b890; --warn:#ffb703; --danger:#ef476f; }
     html,body{height:100%;margin:0;font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial;}
-    body{background:linear-gradient(135deg,#0b1020,#131a35 60%,#0b1020);color:var(--text);}
+    body{background:linear-gradient(135deg,#0b1020,#131a35 60%,#0b1020);color:var(--text);}    
     .wrap{max-width:1100px;margin:24px auto;padding:16px;}
     h1{font-weight:800;letter-spacing:.3px;margin:0 0 6px}
     .sub{color:var(--muted);margin:0 0 18px}
@@ -31,6 +31,7 @@
     .hint{color:var(--muted);font-size:12px}
     #login{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
     #app{display:none}
+    .btn-sm{padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;cursor:pointer}
     @media print{ body{background:white;color:black} .card{box-shadow:none;border:1px solid #ccc} .controls button{display:none} .hint{display:none} }
   </style>
 </head>
@@ -58,14 +59,16 @@
           <label>Inicio<input id="inicio" type="time" /></label>
           <label>Término<input id="termino" type="time" /></label>
           <label>Producto / Concepto<input id="concepto" type="text" placeholder="Consola 1, Pan, Recarga, etc." /></label>
+          <label>Cliente / Deudor<input id="deudor" type="text" placeholder="Nombre si quedó a deber" /></label>
           <label>$ Importe<input id="importe" type="number" step="0.01" inputmode="decimal" /></label>
           <label>Adeudo<input id="adeudo" type="number" step="0.01" inputmode="decimal" value="0" /></label>
           <button id="agregar">Agregar</button>
           <button id="limpiarDia" class="ghost">Vaciar día</button>
           <button id="exportar" class="ghost">Exportar CSV</button>
           <button id="reporte" class="ghost" style="display:none">Reporte</button>
+          <button id="btnDeudores" class="ghost">Deudores</button>
         </div>
-        <p class="hint">Todo se guarda automáticamente por fecha en este navegador.</p>
+        <p class="hint">Todo se guarda automáticamente por fecha en este navegador. Si hay adeudo, agrega el nombre del deudor.</p>
       </div>
 
       <div class="card p16" style="margin-top:16px">
@@ -73,6 +76,7 @@
           <thead>
             <tr>
               <th>#</th><th>Inicio</th><th>Término</th><th>Concepto</th>
+              <th>Deudor</th>
               <th class="right">$ Importe</th><th class="right">$ Adeudo</th><th class="right">$ Pagado</th><th>Usuario</th><th></th>
             </tr>
           </thead>
@@ -108,11 +112,28 @@
         </div>
         <div style="overflow:auto;max-height:420px;margin-top:10px">
           <table style="width:100%">
-            <thead><tr><th>Fecha</th><th>Inicio</th><th>Término</th><th>Concepto</th><th class="right">Importe</th><th class="right">Adeudo</th><th class="right">Pagado</th><th>Usuario</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Inicio</th><th>Término</th><th>Concepto</th><th>Deudor</th><th class="right">Importe</th><th class="right">Adeudo</th><th class="right">Pagado</th><th>Usuario</th></tr></thead>
             <tbody id="repTbody"></tbody>
           </table>
         </div>
       </div>
+
+      <!-- Deudores (cuentas por cobrar) -->
+      <div id="panelDeudores" class="card p16" style="margin-top:16px; display:none">
+        <h3>Cuentas por cobrar</h3>
+        <div class="row" style="align-items:flex-end">
+          <button id="deuActualizar">Actualizar</button>
+          <button id="deuExportar" class="ghost">Exportar CSV</button>
+        </div>
+        <p class="hint">Suma de adeudos por nombre (incluye abonos).</p>
+        <div style="overflow:auto;max-height:420px;margin-top:10px">
+          <table style="width:100%">
+            <thead><tr><th>Deudor</th><th class="right">Saldo</th><th></th></tr></thead>
+            <tbody id="deuTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -126,7 +147,10 @@
   const $ = s => document.querySelector(s);
   const fmt = n => (Number(n)||0).toLocaleString('es-MX',{style:'currency',currency:'MXN'});
   const keyFor = d => `ventas-${d}`;
+  const isVentasKey = k => /^ventas-\d{4}-\d{2}-\d{2}$/.test(k);
   function hoyISO(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+  function esc(s){ if(s==null) return ''; s=String(s); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+  function descargar(contenido, nombre, tipo){ const blob=new Blob([contenido],{type:tipo}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=nombre; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); }
 
   // Estado
   let registros = [];
@@ -142,27 +166,14 @@
       $('#app').style.display='block';
       if(u==='admin'){ $('#reporte').style.display='inline-block'; $('#panelReporte').style.display='block'; }
       init();
-    } else {
-      alert('Usuario o contraseña incorrectos');
-    }
+    } else { alert('Usuario o contraseña incorrectos'); }
   }
   $('#btnLogin').addEventListener('click', onLogin);
-  ['keydown'].forEach(evName=>{
-    document.addEventListener(evName, (e)=>{
-      if($('#login').style.display !== 'none' && e.key==='Enter') onLogin();
-    });
-  });
+  document.addEventListener('keydown', e=>{ if($('#login').style.display!=='none' && e.key==='Enter') onLogin(); });
 
   // ====== Cargar/Guardar ======
-  function cargar(dia){
-    const raw = localStorage.getItem(keyFor(dia));
-    registros = raw ? JSON.parse(raw) : [];
-    render();
-  }
-  function guardar(){
-    const dia = $('#fecha').value;
-    localStorage.setItem(keyFor(dia), JSON.stringify(registros));
-  }
+  function cargar(dia){ const raw=localStorage.getItem(keyFor(dia)); registros = raw? JSON.parse(raw) : []; render(); }
+  function guardar(){ const dia=$('#fecha').value; localStorage.setItem(keyFor(dia), JSON.stringify(registros)); }
 
   // ====== Render ======
   function render(){
@@ -177,11 +188,15 @@
         <td><input class="cell" type="time" value="${r.inicio||''}" data-idx="${i}" data-k="inicio"></td>
         <td><input class="cell" type="time" value="${r.termino||''}" data-idx="${i}" data-k="termino"></td>
         <td><input class="cell" type="text" value="${r.concepto||''}" data-idx="${i}" data-k="concepto"></td>
+        <td><input class="cell" type="text" value="${r.deudor||''}" data-idx="${i}" data-k="deudor" placeholder="Nombre si debe"></td>
         <td class="right"><input class="cell" style="text-align:right" type="number" step="0.01" value="${r.importe||0}" data-idx="${i}" data-k="importe"></td>
         <td class="right"><input class="cell" style="text-align:right" type="number" step="0.01" value="${r.adeudo||0}" data-idx="${i}" data-k="adeudo"></td>
         <td class="right mono">${fmt(pagado)}</td>
         <td>${r.usuario||''}</td>
-        <td class="right"><button data-del="${i}" title="Eliminar">✕</button></td>
+        <td class="right">
+          ${(r.deudor && Number(r.adeudo)>0)?`<button class="btn-sm" data-abonar="${i}">Abonar</button>`:''}
+          <button class="btn-sm" data-del="${i}">✕</button>
+        </td>
       `;
       tbody.appendChild(tr);
     });
@@ -197,31 +212,33 @@
       inicio: $('#inicio').value || '',
       termino: $('#termino').value || '',
       concepto: $('#concepto').value.trim(),
+      deudor: $('#deudor').value.trim(),
       importe: Number($('#importe').value)||0,
       adeudo: Number($('#adeudo').value)||0,
       usuario: usuarioActivo
     };
-    registros.push(r);
-    guardar();
-    ['concepto','importe','adeudo','inicio','termino'].forEach(id=>$('#'+id).value = (id==='adeudo'?0:''));
-    render();
-    $('#concepto').focus();
+    registros.push(r); guardar();
+    ['concepto','deudor','importe','adeudo','inicio','termino'].forEach(id=>$('#'+id).value = (id==='adeudo'?0:''));
+    render(); $('#concepto').focus();
+  }
+
+  // ====== Abonos ======
+  function crearAbono(deudor, monto){
+    if(!deudor || !(Number(monto)>0)) return;
+    const r = {
+      inicio:'', termino:'', concepto:'Abono deuda', deudor,
+      importe: 0, adeudo: -Math.abs(Number(monto)), usuario: usuarioActivo
+    };
+    registros.push(r); guardar(); render();
   }
 
   // ====== Exportar día ======
-  function esc(s){ if(s==null) return ''; s=String(s); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
-  function descargar(contenido, nombre, tipo){
-    const blob = new Blob([contenido], {type: tipo});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download=nombre; a.click();
-    setTimeout(()=>URL.revokeObjectURL(url), 1000);
-  }
   function exportar(){
     const dia = $('#fecha').value;
-    const enc = ['inicio','termino','concepto','importe','adeudo','pagado','usuario'];
+    const enc = ['inicio','termino','concepto','deudor','importe','adeudo','pagado','usuario'];
     const filas = registros.map(r=>{
       const pag = (Number(r.importe)||0)-(Number(r.adeudo)||0);
-      return [r.inicio||'', r.termino||'', esc(r.concepto||''), (Number(r.importe)||0).toFixed(2), (Number(r.adeudo)||0).toFixed(2), pag.toFixed(2), r.usuario||''].join(',');
+      return [r.inicio||'', r.termino||'', esc(r.concepto||''), esc(r.deudor||''), (Number(r.importe)||0).toFixed(2), (Number(r.adeudo)||0).toFixed(2), pag.toFixed(2), r.usuario||''].join(',');
     });
     const csv = [enc.join(','), ...filas].join('\n');
     descargar(csv, `ventas-${dia}.csv`, 'text/csv');
@@ -231,64 +248,52 @@
   let timerAuto=null;
   function scheduleAutoExport(){
     if(timerAuto) clearTimeout(timerAuto);
-    const now = new Date();
-    const next = new Date(now);
-    next.setHours(24,0,5,0); // 00:00:05
+    const now = new Date(); const next = new Date(now); next.setHours(24,0,5,0);
     const delay = Math.max(1000, next - now);
-    timerAuto = setTimeout(()=>{
-      try{ if(registros && registros.length){ exportar(); } }catch(e){ console.warn(e); }
-      scheduleAutoExport();
-    }, delay);
+    timerAuto = setTimeout(()=>{ try{ if(registros && registros.length){ exportar(); } }catch(e){} scheduleAutoExport(); }, delay);
   }
 
   // ====== Reporte (admin) ======
-  function fechasRango(desde,hasta){
-    const out=[]; if(!desde||!hasta) return out;
-    const a=new Date(desde), b=new Date(hasta);
-    for(let d=new Date(a); d<=b; d.setDate(d.getDate()+1)){
-      d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
-      out.push(d.toISOString().slice(0,10));
-    }
-    return out;
-  }
-  function leerDia(dia){
-    const raw = localStorage.getItem(keyFor(dia));
-    return raw ? JSON.parse(raw).map(x=>({ ...x, _fecha: dia })) : [];
-  }
+  function fechasRango(desde,hasta){ const out=[]; if(!desde||!hasta) return out; const a=new Date(desde), b=new Date(hasta); for(let d=new Date(a); d<=b; d.setDate(d.getDate()+1)){ d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); out.push(d.toISOString().slice(0,10)); } return out; }
+  function leerDia(dia){ const raw=localStorage.getItem(keyFor(dia)); return raw? JSON.parse(raw).map(x=>({ ...x, _fecha: dia })) : []; }
   function generarReporte(){
     const desde = $('#repDesde').value || hoyISO();
     const hasta = $('#repHasta').value || hoyISO();
     const u = ($('#repUsuario')?.value || '').trim();
     let rows = fechasRango(desde,hasta).flatMap(leerDia);
     if(u) rows = rows.filter(r => (r.usuario||'')===u);
+    let tV=0,tA=0,tC=0; rows.forEach(r=>{ tV+=Number(r.importe)||0; tA+=Number(r.adeudo)||0; tC+=((Number(r.importe)||0)-(Number(r.adeudo)||0)); });
+    $('#repTotalVentas').textContent = fmt(tV); $('#repTotalAdeudos').textContent = fmt(tA); $('#repTotalCobrado').textContent = fmt(tC); $('#repFilas').textContent = rows.length;
+    const tb = $('#repTbody'); tb.innerHTML=''; rows.forEach(r=>{ const pag=(Number(r.importe)||0)-(Number(r.adeudo)||0); const tr=document.createElement('tr'); tr.innerHTML = `<td>${r._fecha}</td><td>${r.inicio||''}</td><td>${r.termino||''}</td><td>${r.concepto||''}</td><td>${r.deudor||''}</td><td class="right">${(Number(r.importe)||0).toFixed(2)}</td><td class="right">${(Number(r.adeudo)||0).toFixed(2)}</td><td class="right">${pag.toFixed(2)}</td><td>${r.usuario||''}</td>`; tb.appendChild(tr); });
+    window.__repRows = rows; window.__repDesde = desde; window.__repHasta = hasta; window.__repUsuario = u;
+  }
+  function exportarReporte(){ const enc=['fecha','inicio','termino','concepto','deudor','importe','adeudo','pagado','usuario']; const filas=(window.__repRows||[]).map(r=>{ const pag=(Number(r.importe)||0)-(Number(r.adeudo)||0); return [r._fecha,r.inicio||'',r.termino||'',esc(r.concepto||''),esc(r.deudor||''),(Number(r.importe)||0).toFixed(2),(Number(r.adeudo)||0).toFixed(2),pag.toFixed(2),r.usuario||''].join(','); }); descargar([enc.join(','),...filas].join('\n'), `reporte${window.__repUsuario?`-${window.__repUsuario}`:''}-${window.__repDesde}_a_${window.__repHasta}.csv`, 'text/csv'); }
 
-    let tV=0,tA=0,tC=0;
-    rows.forEach(r=>{ tV+=Number(r.importe)||0; tA+=Number(r.adeudo)||0; tC+=((Number(r.importe)||0)-(Number(r.adeudo)||0)); });
-    $('#repTotalVentas').textContent = fmt(tV);
-    $('#repTotalAdeudos').textContent = fmt(tA);
-    $('#repTotalCobrado').textContent = fmt(tC);
-    $('#repFilas').textContent = rows.length;
-
-    const tb = $('#repTbody'); tb.innerHTML='';
-    rows.forEach(r=>{
-      const pag = (Number(r.importe)||0)-(Number(r.adeudo)||0);
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${r._fecha}</td><td>${r.inicio||''}</td><td>${r.termino||''}</td><td>${r.concepto||''}</td><td class="right">${(Number(r.importe)||0).toFixed(2)}</td><td class="right">${(Number(r.adeudo)||0).toFixed(2)}</td><td class="right">${pag.toFixed(2)}</td><td>${r.usuario||''}</td>`;
+  // ====== Deudores (cuentas por cobrar) ======
+  function recolectarDeudas(){
+    const saldos = new Map(); // deudor -> saldo
+    // recorre todas las fechas guardadas
+    Object.keys(localStorage).filter(isVentasKey).forEach(k=>{
+      try{ const arr = JSON.parse(localStorage.getItem(k)||'[]'); arr.forEach(r=>{ if(r.deudor){ const prev=saldos.get(r.deudor)||0; saldos.set(r.deudor, prev + (Number(r.adeudo)||0)); } }); }catch(_){/* noop */}
+    });
+    return saldos;
+  }
+  function pintarDeudores(){
+    const saldos = recolectarDeudas();
+    const tb = $('#deuTbody'); tb.innerHTML='';
+    const rows=[...saldos.entries()].sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+    rows.forEach(([nombre, saldo])=>{
+      if(!nombre) return;
+      const tr=document.createElement('tr');
+      tr.innerHTML = `<td>${nombre}</td><td class="right">${fmt(saldo)}</td><td>${saldo>0?`<button class="btn-sm" data-abonar-global="${nombre}">Abonar</button>`:''}</td>`;
       tb.appendChild(tr);
     });
-
-    // Guardar para exportar
-    window.__repRows = rows;
-    window.__repDesde = desde; window.__repHasta = hasta; window.__repUsuario = u;
   }
-  function exportarReporte(){
-    const enc = ['fecha','inicio','termino','concepto','importe','adeudo','pagado','usuario'];
-    const filas = (window.__repRows||[]).map(r=>{
-      const pag=(Number(r.importe)||0)-(Number(r.adeudo)||0);
-      return [r._fecha, r.inicio||'', r.termino||'', esc(r.concepto||''), (Number(r.importe)||0).toFixed(2), (Number(r.adeudo)||0).toFixed(2), pag.toFixed(2), r.usuario||''].join(',');
-    });
-    const suf = window.__repUsuario ? `-${window.__repUsuario}` : '';
-    descargar([enc.join(','), ...filas].join('\n'), `reporte${suf}-${window.__repDesde}_a_${window.__repHasta}.csv`, 'text/csv');
+  function exportarDeudores(){
+    const saldos = recolectarDeudas();
+    const enc=['deudor','saldo'];
+    const filas=[...saldos.entries()].map(([n,s])=>[esc(n),(Number(s)||0).toFixed(2)].join(','));
+    descargar([enc.join(','),...filas].join('\n'), 'deudores.csv', 'text/csv');
   }
 
   // ====== Eventos UI ======
@@ -296,11 +301,7 @@
     const t = ev.target;
     if(t.matches('input.cell')){
       const i = Number(t.dataset.idx); const k = t.dataset.k;
-      if(!Number.isNaN(i) && registros[i]){
-        registros[i][k] = (t.type==='number') ? Number(t.value) : t.value;
-        guardar();
-        render();
-      }
+      if(!Number.isNaN(i) && registros[i]){ registros[i][k] = (t.type==='number') ? Number(t.value) : t.value; guardar(); render(); }
     }
   });
   document.addEventListener('click', (ev)=>{
@@ -310,25 +311,25 @@
     if(t.id==='reporte'){ const p=$('#panelReporte'); if(p){ p.style.display='block'; p.scrollIntoView({behavior:'smooth'}); } }
     if(t.id==='repGenerar') generarReporte();
     if(t.id==='repExportar') exportarReporte();
-    if(t.id==='limpiarDia'){
-      if(confirm('¿Vaciar todos los registros de este día?')){ registros=[]; guardar(); render(); }
+    if(t.id==='limpiarDia'){ if(confirm('¿Vaciar todos los registros de este día?')){ registros=[]; guardar(); render(); } }
+    if(t.dataset && t.dataset.del){ const i=Number(t.dataset.del); registros.splice(i,1); guardar(); render(); }
+    if(t.dataset && t.dataset.abonar){
+      const i=Number(t.dataset.abonar); const r=registros[i];
+      const amt = prompt(`Abono para ${r.deudor}: monto a cobrar`, r.adeudo||'');
+      if(amt && Number(amt)>0){ crearAbono(r.deudor, Number(amt)); }
     }
-    if(t.dataset && t.dataset.del){
-      const i = Number(t.dataset.del);
-      registros.splice(i,1); guardar(); render();
-    }
+    if(t.id==='btnDeudores'){ const p=$('#panelDeudores'); p.style.display='block'; pintarDeudores(); p.scrollIntoView({behavior:'smooth'}); }
+    if(t.id==='deuActualizar'){ pintarDeudores(); }
+    if(t.id==='deuExportar'){ exportarDeudores(); }
+    if(t.dataset && t.dataset.abonarGlobal){ const nombre=t.dataset.abonarGlobal; const amt=prompt(`Abono para ${nombre}: monto a cobrar`, ''); if(amt && Number(amt)>0){ crearAbono(nombre, Number(amt)); pintarDeudores(); } }
   });
   $('#fecha')?.addEventListener('change',()=>cargar($('#fecha').value));
 
   // ====== Init tras login ======
   function init(){
-    $('#fecha').value = hoyISO();
-    cargar($('#fecha').value);
-    scheduleAutoExport();
-
-    // Prellenar rango reporte semana actual
-    const today = hoyISO();
-    const d = new Date(today); d.setDate(d.getDate()-6); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+    $('#fecha').value = hoyISO(); cargar($('#fecha').value); scheduleAutoExport();
+    // Semana actual por defecto en reporte
+    const today = hoyISO(); const d = new Date(today); d.setDate(d.getDate()-6); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
     if($('#repDesde')) $('#repDesde').value = d.toISOString().slice(0,10);
     if($('#repHasta')) $('#repHasta').value = today;
     if(usuarioActivo==='admin') generarReporte();
